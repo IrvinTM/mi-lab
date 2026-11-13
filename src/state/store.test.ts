@@ -525,3 +525,42 @@ describe('catalog, settings and backups', () => {
     expect(store.getState().data.settings.labName).toBe('Importado');
   });
 });
+
+describe('areas', () => {
+  it('addArea trims the name and creates an id', async () => {
+    const { store } = await readyStore();
+    const result = store.getState().addArea('  Hematología ');
+    expect(result).toEqual({ ok: true, areaId: 'id-1' });
+    expect(store.getState().data.areas.at(-1)).toEqual({ id: 'id-1', name: 'Hematología' });
+  });
+
+  it('addArea rejects empty and duplicate names (ignoring case and accents)', async () => {
+    const { store } = await readyStore();
+    const before = store.getState().data;
+    expect(failureOf(store.getState().addArea('   ')).errors.name).toMatch(/Escribe el nombre/);
+    expect(failureOf(store.getState().addArea('QUIMICA SECA')).errors.name).toMatch(/Ya existe/);
+    expect(store.getState().data).toBe(before);
+  });
+
+  it('renameArea renames, allows changing only the case, and rejects duplicates', async () => {
+    const { store } = await readyStore();
+    store.getState().addArea('Hematología');
+    expect(store.getState().renameArea('a1', 'quimica SECA')).toEqual({ ok: true });
+    expect(store.getState().data.areas[0]!.name).toBe('quimica SECA');
+    expect(failureOf(store.getState().renameArea('a1', 'hematologia')).errors.name).toMatch(
+      /Ya existe/,
+    );
+    expect(failureOf(store.getState().renameArea('a1', ' ')).errors.name).toMatch(/Escribe/);
+    expect(failureOf(store.getState().renameArea('nope', 'X')).errors.id).toMatch(/No se encontró/);
+  });
+
+  it('removeArea refuses areas with products and removes empty ones', async () => {
+    const { store } = await readyStore();
+    const { areaId } = store.getState().addArea('Hematología') as { ok: true; areaId: string };
+    expect(failureOf(store.getState().removeArea('a1')).error).toMatch(/tiene 2 productos/);
+    expect(store.getState().data.areas).toHaveLength(2);
+    expect(store.getState().removeArea(areaId)).toEqual({ ok: true });
+    expect(store.getState().data.areas.map((a) => a.id)).toEqual(['a1']);
+    expect(failureOf(store.getState().removeArea(areaId)).errors.id).toMatch(/No se encontró/);
+  });
+});
