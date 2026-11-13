@@ -678,7 +678,7 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 ### Fase 6 — Imprimir, respaldo, ajustes
 - [~] **T6.1** ~~Exportar CSV: lista de productos, kardex de un producto, pedido de compra.~~ Diferida (ver §12).
 - [x] **T6.2** Imprimir kardex con `@media print` estilo tarjeta MINSAL.
-- [ ] **T6.3** Ajustes (§8.4) incluyendo fecha simulada, respaldo/restauración JSON y reset demo.
+- [x] **T6.3** Ajustes (§8.4) incluyendo fecha simulada, respaldo/restauración JSON y reset demo.
 
 ### Fase 7 — Pulido y revisión
 - [ ] **T7.1** Auditoría con la skill `apple-design` (modo revisión) sobre cada pantalla;
@@ -758,4 +758,5 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 | 2026-11-13 | Salida (T5.2): `/salida?producto=&lote=`; vista previa FEFO en vivo ("12 de LT004512 · vence en 9 días", nunca lotes vencidos); "Elegir lote manualmente" muestra un `Select` de lotes con saldo y no vencidos (el FEFO marcado "sugerido"); elegir otro lote muestra el aviso naranja y exige "Motivo"; si el lote de la URL no se puede usar, cae al lote FEFO. Toast "Salida registrada · …" con "Deshacer" | Decisiones de implementación de T5.2 |
 | 2026-11-13 | Baja, ajuste y edición (T5.3, T5.4): componentes compartidos en `features/shared` — `useWriteOff` (alerta destructiva, retira el saldo completo, toast con "Deshacer"), `useAdjust` (sheet: aumentar/disminuir + motivo obligatorio; no deja el lote en negativo) y `EditProductSheet` (nombre, área, unidad base, presentación, unidades por presentación, mín, máx, consumo manual, código, nº de tarjeta; un campo vacío elimina el valor; máx ≥ mín). "Dar de baja" aparece en Vencimientos y en los lotes vencidos del detalle; "Ajustar" y "Editar" en el detalle del producto. Las pantallas que los usan requieren `ToastProvider` (lo da `Shell`) | Decisiones de implementación |
 | 2026-11-13 | Imprimir kardex (T6.2): `PrintableLedger` (oculto en pantalla, `aria-hidden`) con encabezado `settings.labName` (el modelo no tiene región), datos del producto, las 11 columnas y nota de overrides FEFO; página con nombre `@page kardex { size: landscape }` y marcas `data-print="hide"` en el shell. `LedgerSection` ahora recibe el `ProductRow`. **Falta verificar en la vista previa de impresión de un navegador** | Decisiones del agente de T6.2 |
+| 2026-11-13 | Ajustes (T6.3): secciones Laboratorio, Alertas de vencimiento, Compras, Fecha simulada (se aplica al cambiar el campo), Respaldo y Áreas. Restaurar valida con `migrate()` antes de pedir confirmación (la alerta destructiva solo aparece si el archivo es válido). Nuevas acciones del store `addArea`, `renameArea`, `removeArea` (sin duplicados ignorando mayúsculas/acentos; no se borra un área con productos) | Decisiones del agente de T6.3 |
 | 2026-11-13 | Tarjeta de Urea renumerada a LRC-07-24 en el seed | El original duplica LRC-06-24 |
