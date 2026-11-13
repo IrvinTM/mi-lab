@@ -647,12 +647,12 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
   `aria-describedby`).
 - [x] **T3.3** `SegmentedControl` (radiogroup con flechas de teclado), `List`/`ListRow` (estilo
   insetGrouped), `Table` (encabezados ordenables con `aria-sort`, filas clicables accesibles).
-- [ ] **T3.4** `Sheet` (usar `<dialog>` nativo con `showModal()`, trampa de foco nativa, `Esc`,
+- [x] **T3.4** `Sheet` (usar `<dialog>` nativo con `showModal()`, trampa de foco nativa, `Esc`,
   animación respetando reduced-motion; en < 600 px aparece desde abajo), `Alert` de confirmación
   destructiva, `Toast` (región `aria-live`, acción "Deshacer", auto-cierre 5 s pausable con hover/foco).
 - [x] **T3.5** `EmptyState` (ícono, título, texto, acción), `Sidebar` + `TabBar` + layout
   `AppShell` responsive (§8.3) con `NavLink` activo.
-- [ ] **T3.6** Página temporal `/dev/ui` (solo en `import.meta.env.DEV`) que muestra todos los
+- [x] **T3.6** Página temporal `/dev/ui` (solo en `import.meta.env.DEV`) que muestra todos los
   componentes en claro/oscuro para revisión visual.
 
 ### Fase 4 — Pantallas de lectura
@@ -751,4 +751,5 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 | 2026-11-13 | **Pendiente de decisión (contraste)**: con los tokens de §8.2, los botones con color de acento no llegan a 4.5:1 (relleno `filled` 4.02 claro / 3.65 oscuro; `destructive` 3.55 / 3.41; `tinted` 3.30 / 3.92; texto `plain` ≈ 4.0 en claro). `Badge` cumple (≥ 11.8:1). Se resuelve en T7.1/T7.2 (auditoría de contraste), ajustando `--color-accent`/`--color-red` en `tokens.css` | Hallazgo de T3.1; cambiar la paleta es una decisión de diseño aparte |
 | 2026-11-13 | Kit UI (T3.1–T3.3): componentes controlados con `onChange(valor)` (no el evento); `NumberField` entero `number \| null` (`allowNegative` para ajustes); `DateField` string `YYYY-MM-DD`; `SearchField` con atajo `/` (el atajo `⌘K` de §8.3 se hará en T4.1); `Table` con orden controlado (`sort`, `onSortChange`) y fila clicable por teclado; `ListRow` con `href`/`onClick` sin importar react-router; `Stat` acepta `as` para usar un `Link`. Se agregan los pesos de fuente como tokens (`--font-weight-regular/medium/semibold/bold` → `font-semibold`…) porque `--font-*: initial` borraba los de Tailwind | Decisiones de API de los agentes de T3.1–T3.3 |
 | 2026-11-13 | Layout (T3.5): `AppShell` (sidebar ≥ 900 px, barra superior + `TabBar` por debajo; enlace "Saltar al contenido"; `main#main`), `PageHeader` (título grande + acciones) y `NavItem` `{ to, label, icon, end? }`. Los breakpoints de Tailwind se reemplazan por dos tokens: `desktop:` (900 px) y `sheet:` (600 px). En móvil, Ajustes va como engranaje en la barra superior y Entrada/Salida en el `PageHeader`; el estado activo se marca con peso, ícono de acento y `aria-current` (el texto no usa el acento por contraste) | §8.3 pedía 900 px y 600 px, que Tailwind no trae |
+| 2026-11-13 | Kit UI (T3.4 y T3.6): `Sheet` (`<dialog>` nativo, desde abajo < 600 px, se cierra con Esc/fondo/botón; contenido desmontado al cerrar para que los formularios arranquen limpios), `Alert` (`alertdialog`, el fondo no la cierra; la destructiva enfoca Cancelar), `ToastProvider` + `useToast().show({ message, action? })`. Barrel en `src/ui/index.ts`. Página `/dev/ui` (`features/dev/UiGallery.tsx`) solo con `import.meta.env.DEV`; `router.tsx` mínimo (T4.1 lo amplía) | Decisiones de API de T3.4; la galería no entra al build de producción |
 | 2026-11-13 | Tarjeta de Urea renumerada a LRC-07-24 en el seed | El original duplica LRC-06-24 |
