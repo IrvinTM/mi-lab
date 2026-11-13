@@ -664,7 +664,7 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
   kardex.
 - [ ] **T4.4** Vencimientos (`/vencimientos`).
 - [ ] **T4.5** Compras (`/compras`) (sin selección ni cantidades editables: solo servían para exportar).
-- [ ] **T4.6** Resumen (`/`).
+- [x] **T4.6** Resumen (`/`).
 
 ### Fase 5 — Pantallas de escritura
 - [ ] **T5.1** Sheet "Registrar entrada" + ruta `/entrada` + toast con deshacer.
