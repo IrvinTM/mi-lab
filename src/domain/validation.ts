@@ -1,4 +1,5 @@
 import { daysUntil, isValidISODate } from './dates';
+import { countNoun } from './plural';
 import type { ISODate, Lot, Settings } from './types';
 
 /** Messages are Spanish and ready to show; keys are form field names. */
@@ -32,16 +33,6 @@ function isPositiveInteger(value: number | null | undefined): value is number {
 
 function dayCount(days: number): string {
   return days === 1 ? '1 día' : `${days} días`;
-}
-
-/** Spanish plural of a base unit: prueba → pruebas, unidad → unidades. */
-function pluralEs(unit: string, count: number): string {
-  if (count === 1) return unit;
-  return /[aeiouáéíóú]$/i.test(unit) ? `${unit}s` : `${unit}es`;
-}
-
-function quantityLabel(count: number, unit: string): string {
-  return `${count} ${pluralEs(unit, count)}`;
 }
 
 // --- Receipt (entrada) -------------------------------------------------------------------------
@@ -157,8 +148,8 @@ export function validateIssue(form: IssueForm, context: IssueContext): Validatio
   } else if (form.quantity > usableBalance) {
     errors.quantity =
       usableBalance === 1
-        ? `Solo hay ${quantityLabel(usableBalance, unit)} disponible (no vencida).`
-        : `Solo hay ${quantityLabel(usableBalance, unit)} disponibles (no vencidas).`;
+        ? `Solo hay ${countNoun(usableBalance, unit)} disponible (no vencida).`
+        : `Solo hay ${countNoun(usableBalance, unit)} disponibles (no vencidas).`;
   }
 
   if (form.lotId) {
@@ -169,7 +160,7 @@ export function validateIssue(form: IssueForm, context: IssueContext): Validatio
     } else if (selectedLot.balance <= 0) {
       errors.lotId = `El lote ${selectedLot.lotNumber} no tiene saldo.`;
     } else if (isPositiveInteger(form.quantity) && form.quantity > selectedLot.balance) {
-      errors.quantity = `Solo hay ${quantityLabel(selectedLot.balance, unit)} en el lote ${selectedLot.lotNumber}.`;
+      errors.quantity = `Solo hay ${countNoun(selectedLot.balance, unit)} en el lote ${selectedLot.lotNumber}.`;
     }
 
     if (!errors.lotId && firstFefoLot && firstFefoLot.id !== form.lotId) {
