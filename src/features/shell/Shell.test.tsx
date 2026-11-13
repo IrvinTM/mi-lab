@@ -43,7 +43,7 @@ describe('Shell', () => {
     ['/ajustes', 'Ajustes'],
     ['/entrada', 'Registrar entrada'],
     ['/salida', 'Registrar salida'],
-    ['/productos/p1', 'Producto'],
+    ['/productos/p1', 'Glucosa'],
   ])('routes %s to "%s"', async (path, title) => {
     renderApp(path);
     expect(await screen.findByRole('heading', { level: 1, name: title })).toBeInTheDocument();
@@ -97,7 +97,7 @@ describe('global shortcuts', () => {
   it('keeps the product when used from its detail page', async () => {
     const user = userEvent.setup();
     const router = renderApp('/productos/p1');
-    await screen.findByRole('heading', { name: 'Producto' });
+    await screen.findByRole('heading', { name: 'Glucosa' });
     await user.keyboard('s');
     expect(router.state.location.pathname + router.state.location.search).toBe(
       '/salida?producto=p1',
