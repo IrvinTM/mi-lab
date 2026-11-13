@@ -34,7 +34,10 @@ El MVP debe permitir, de punta a punta:
   primero (FEFO)** y avisa si el usuario intenta usar otro.
 - Ver el **kardex** de cada producto (equivalente digital de la tarjeta MINSAL), con saldo y
   cobertura en meses calculados correctamente (sin `#DIV/0!`).
-- Respaldar/restaurar los datos en JSON. (La exportación a CSV queda fuera del MVP, ver §12.)
+- Respaldar/restaurar los datos en JSON (completo, tal como está hoy).
+- **Descargar informes en Excel** (`.xlsx`, compatible con Excel y Google Sheets) del mes o de un
+  rango de fechas: movimientos de entrada y salida, cuadre por producto y existencias (§8.4
+  "Informes", Fase 8). El Excel es solo una salida: no se importa de vuelta.
 
 ### Fuera de alcance del MVP (ver §12 "Después del MVP")
 
@@ -75,6 +78,7 @@ importación directa de Excel, notificaciones por correo.
 | Fechas | Utilidades propias en `src/domain/dates.ts` sobre strings `YYYY-MM-DD` | Evitar errores de zona horaria (ver §6.6) |
 | IDs | `crypto.randomUUID()`, con UUID v4 sobre `crypto.getRandomValues()` si no existe (`state/id.ts`) | Nativo; `randomUUID` solo existe en HTTPS/localhost |
 | Tests | **Vitest** + **@testing-library/react** + jsdom | Lógica de dominio 100 % probada |
+| Informes Excel | **Librería XLSX por decidir en T8.1** (carga diferida con `import()`, fuera del bundle inicial; sin vulnerabilidades en `pnpm audit`; licencia compatible; no la versión abandonada de SheetJS en npm). Se registra aquí al elegirla | Generar `.xlsx` con hojas, fechas y números reales, filtros y anchos; CSV no lo permite |
 | Lint/format | ESLint (config de Vite) + Prettier | |
 | Persistencia MVP | `localStorage` detrás de la interfaz `InventoryRepository` | Cambiar a API/DB sin tocar UI |
 
@@ -129,6 +133,7 @@ src/
     today.ts               # fuente única de "hoy" (sobrescribible en ajustes para demos)
     derive.ts              # derivaciones puras memoizadas por (data, today)
     backup.ts              # tamaño máximo y validación de un archivo de respaldo
+    (domain/report.ts)     # datos del informe por periodo, puros y probados (T8.2)
     id.ts                  # newId(): UUID v4 también fuera de HTTPS
   ui/                      # KIT DE COMPONENTES (estilo Apple), sin lógica de negocio
     Button/ Badge/ Card/ List/ Table/ Sheet/ SegmentedControl/ SearchField/
@@ -142,6 +147,7 @@ src/
     issue/                 # Registrar salida (FEFO)
     expiring/              # Vencimientos
     purchasing/            # Compras sugeridas
+    reports/               # Informes: elegir periodo y descargar el Excel (T8.4)
     settings/              # Ajustes, respaldo, datos demo
   styles/
     tokens.css
@@ -490,10 +496,10 @@ fondo tintado al 15 %, no texto amarillo).
 ### 8.3 Layout
 
 - **Escritorio (≥ 900 px)**: barra lateral (sidebar) estilo macOS, 240 px, fondo
-  `--color-bg-secondary`, con secciones: *Resumen, Productos, Vencimientos, Compras* y abajo
+  `--color-bg-secondary`, con secciones: *Resumen, Productos, Vencimientos, Compras, Informes* y abajo
   *Ajustes*. Contenido con título grande (`--text-large-title`) y barra de herramientas a la
   derecha con los botones primarios **"+ Entrada"** y **"− Salida"** siempre visibles.
-- **Móvil/tablet (< 900 px)**: barra de pestañas inferior con las mismas 4 secciones + botón
+- **Móvil/tablet (< 900 px)**: barra de pestañas inferior con las mismas 5 secciones + botón
   flotante no; las acciones Entrada/Salida van en la barra superior.
 - Formularios de Entrada/Salida se abren como **sheet** (modal anclado; en móvil desde abajo)
   y también tienen ruta propia (`/entrada`, `/salida`) para enlaces directos.
@@ -560,6 +566,30 @@ fondo tintado al 15 %, no texto amarillo).
 - Lista de productos con estado `out` o `reorder` primero, luego `unknown`.
 - Columnas: producto, saldo útil, pérdida proyectada, mín, máx, cobertura efectiva, **sugerido**
   (unidades y presentaciones).
+
+**Informes (`/informes`)**
+- Selector de periodo: **Este mes**, **Mes anterior**, **Elegir mes** y **Rango** (Desde/Hasta);
+  el periodo nunca incluye fechas futuras y la fecha de corte es `min(hasta, hoy)`.
+- Vista previa antes de descargar: periodo, nº de movimientos, entradas, salidas y bajas (unidades
+  y $); aviso si el periodo no tiene movimientos.
+- Botón **"Descargar informe (Excel)"** → `mi-lab-informe-<desde>_<hasta>.xlsx`. La librería se carga
+  solo al pulsarlo.
+- El archivo tiene una hoja por tema, cada una una **tabla plana** (un solo encabezado en negrita,
+  fila fija y filtros, sin celdas combinadas), fechas y números reales con formato, textos como texto
+  (códigos y nº de lote nunca como número), unidad en su propia columna y anchos ajustados:
+  1. **Resumen**: laboratorio, periodo, fecha de generación, totales de entradas, salidas, ajustes,
+     bajas y su valor en $.
+  2. **Por producto**: producto, área, unidad, saldo inicial, entradas, salidas, ajustes, bajas,
+     saldo final (cuadre: inicial + entradas − salidas ± ajustes − bajas = final) y valor.
+  3. **Movimientos**: una fila por movimiento del periodo: fecha, tipo, producto, área, nº de lote,
+     vencimiento, procedencia, cantidad (con signo), precio, valor, concepto, motivo si la salida no
+     siguió FEFO y saldo del producto después del movimiento.
+  4. **Existencias**: a la fecha de corte, por producto: saldo útil, vencido, próximo vencimiento,
+     mínimo, máximo, cobertura y estado de compra.
+  5. **Lotes**: lotes con saldo a la fecha de corte: producto, lote, vencimiento, estado, saldo, valor.
+- Riesgos a cubrir con tests (ver §13): que cuadre con lo que muestra la pantalla, textos hostiles
+  (`=`, `+`, `-`, `@` al inicio) como texto, hojas con nombre válido (≤ 31 caracteres, sin `[]:*?/\`),
+  fechas sin husos horarios y que el archivo se abra de nuevo sin pérdida.
 
 **Ajustes (`/ajustes`)**
 - Nombre del laboratorio, días crítico/advertencia, meses mín/máx por defecto.
@@ -687,7 +717,7 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 - [x] **T5.4** Editar producto (sheet) — mín/máx/consumo/unidades por presentación.
 
 ### Fase 6 — Imprimir, respaldo, ajustes
-- [~] **T6.1** ~~Exportar CSV: lista de productos, kardex de un producto, pedido de compra.~~ Diferida (ver §12).
+- [~] **T6.1** ~~Exportar CSV: lista de productos, kardex de un producto, pedido de compra.~~ Reemplazada por la Fase 8 (informe en Excel).
 - [x] **T6.2** Imprimir kardex con `@media print` estilo tarjeta MINSAL.
 - [x] **T6.3** Ajustes (§8.4) incluyendo fecha simulada, respaldo/restauración JSON y reset demo.
 
@@ -701,6 +731,25 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 - [x] **T7.4** Guion de demo en `docs/DEMO.md`: 5 minutos mostrando (1) Resumen con lotes por
   vencer, (2) salida FEFO que toma el lote correcto, (3) intento de override con advertencia,
   (4) entrada de lote nuevo, (5) lista de compras exportada.
+
+### Fase 8 — Informes en Excel
+Criterio común: `pnpm run check` y `pnpm run build` en verde; el bundle inicial no crece (la
+librería va con `import()`); el informe usa las mismas derivaciones que la pantalla.
+- [ ] **T8.1** Elegir la librería XLSX: comparar 2–3 candidatas (mantenimiento, tamaño gzip,
+  licencia, `pnpm audit`, soporte de tipos de celda, fechas, anchos, filtros, fila fija). Hacer una
+  prueba que genere un `.xlsx` y lo abra de vuelta. Registrarla en §4 y en §13 con el motivo.
+- [ ] **T8.2** `domain/report.ts` + tests: `buildReport(data, { from, to }, today)` con el
+  resumen, el cuadre por producto, los movimientos con saldo posterior, las existencias y los lotes.
+  Tests: inicial + entradas − salidas ± ajustes − bajas = final en **todos** los productos del seed,
+  periodos vacíos, periodo que cruza meses y años, fecha de corte = `min(hasta, hoy)`, sin NaN.
+- [ ] **T8.3** `lib/xlsx.ts` (o `features/reports/`) + tests: convierte el informe en el libro de
+  §8.4 (formatos de fecha, moneda y entero, texto como texto, anchos, filtros, fila fija,
+  nombres de hoja válidos). Tests: leer el archivo generado y comparar con los datos; cadenas
+  hostiles; ids y lotes con aspecto de número o de fecha; 20 000 movimientos en tiempo razonable.
+- [ ] **T8.4** Pantalla `/informes` (§8.4) y entrada en la barra lateral/pestañas; descarga con
+  `Blob` y `revokeObjectURL`; estados vacíos y de error; accesibilidad (teclado, nombres, `aria-live`).
+- [ ] **T8.5** Verificación en Excel, Google Sheets y LibreOffice (manual, anotar el resultado en
+  `docs/REVIEW.md`) y actualizar `docs/DEMO.md` con el paso del informe.
 
 ## 11. Protocolo para agentes
 
@@ -717,9 +766,12 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 
 ## 12. Después del MVP (no implementar todavía)
 
-- **Exportar a CSV** (diferida por decisión del usuario): lista de productos, kardex de un producto y
-  pedido de compra con filas seleccionables y cantidades editables; `lib/csv.ts` (BOM UTF-8 para
-  que Excel abra acentos; separador `,`; escapar comillas) y botones "Exportar" en kardex y Compras.
+- **Exportar un rango en JSON y combinarlo en otra máquina** (diferido): un rango parcial no es un
+  respaldo, así que debe llevar el **saldo inicial por lote** a la fecha de inicio y la importación
+  debe **combinar** (no reemplazar): sin duplicar movimientos con el mismo id, emparejando lotes
+  por producto + nº de lote y rechazando el paquete si dejara un saldo negativo. El respaldo completo
+  en JSON sigue siendo la forma de pasar todo a otra máquina.
+- **CSV opcional por hoja** del informe, si alguien lo necesita para otro sistema.
 - **Base de datos + API**: Postgres (Supabase o servidor propio) implementando
   `InventoryRepository`; tablas `products`, `lots`, `movements`, `areas`, `funding_sources`,
   `settings`; los saldos como vista SQL (`SUM` por lote). Sincronización offline-first.
@@ -770,6 +822,7 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 | 2026-11-13 | Baja, ajuste y edición (T5.3, T5.4): componentes compartidos en `features/shared` — `useWriteOff` (alerta destructiva, retira el saldo completo, toast con "Deshacer"), `useAdjust` (sheet: aumentar/disminuir + motivo obligatorio; no deja el lote en negativo) y `EditProductSheet` (nombre, área, unidad base, presentación, unidades por presentación, mín, máx, consumo manual, código, nº de tarjeta; un campo vacío elimina el valor; máx ≥ mín). "Dar de baja" aparece en Vencimientos y en los lotes vencidos del detalle; "Ajustar" y "Editar" en el detalle del producto. Las pantallas que los usan requieren `ToastProvider` (lo da `Shell`) | Decisiones de implementación |
 | 2026-11-13 | Imprimir kardex (T6.2): `PrintableLedger` (oculto en pantalla, `aria-hidden`) con encabezado `settings.labName` (el modelo no tiene región), datos del producto, las 11 columnas y nota de overrides FEFO; página con nombre `@page kardex { size: landscape }` y marcas `data-print="hide"` en el shell. `LedgerSection` ahora recibe el `ProductRow`. **Falta verificar en la vista previa de impresión de un navegador** | Decisiones del agente de T6.2 |
 | 2026-11-13 | Ajustes (T6.3): secciones Laboratorio, Alertas de vencimiento, Compras, Fecha simulada (se aplica al cambiar el campo), Respaldo y Áreas. Restaurar valida con `migrate()` antes de pedir confirmación (la alerta destructiva solo aparece si el archivo es válido). Nuevas acciones del store `addArea`, `renameArea`, `removeArea` (sin duplicados ignorando mayúsculas/acentos; no se borra un área con productos) | Decisiones del agente de T6.3 |
+| 2026-11-13 | **Se reabre la exportación como informe en Excel** (reemplaza la decisión de dejar fuera el CSV): el archivo `.xlsx` con varias hojas es la forma de guardar/archivar el inventario (mensual o por rango); se descarga desde `/informes`. XLSX y no CSV: el CSV tiene una sola hoja, depende de la configuración regional (`;` vs `,`), puede convertir fechas/códigos/lotes y es vulnerable a inyección de fórmulas. El JSON queda **como está** (respaldo completo); el JSON por rango con saldo inicial y su importación combinada se difiere (§12). Riesgos a cubrir: librería (mantenimiento, `pnpm audit`, tamaño → carga diferida), que el informe cuadre con la pantalla, textos hostiles, privacidad (sin cifrar) y que el Excel no se importa de vuelta | Decisión del usuario; análisis de riesgos |
 | 2026-11-13 | Tarjeta de Urea renumerada a LRC-07-24 en el seed | El original duplica LRC-06-24 |
 | 2026-11-13 | **Contraste (T7.1)**: los tokens de color se separan por rol. `--color-accent` es solo para texto, íconos y anillo de foco (`#0055ba` claro / `#4da3ff` oscuro); `--color-accent-fill(-hover/-active)` (`#0071e3`/`#0066cc`/`#0058b0`) es el fondo de botones `filled` bajo `--color-on-accent` (blanco, 4.70:1). Igual para rojo: `--color-danger` (texto y error: `#c80014` / `#ff6961`) y `--color-danger-fill(-hover/-active)` (`#d70015`…). `tinted` usa el acento al 12/16/20 %. `--color-label-secondary` claro sube a 0.78 de opacidad; `--color-label-tertiary` queda solo para glifos decorativos. Nuevos: `--color-control-border` (borde de campos, ≥ 3:1), `--color-segment-selected`, `--color-scrim` (40 % / 60 %) y `--tabbar-height`. Los tonos de estado (`red`, `orange`…) solo tiñen badges e íconos. `src/styles/contrast.test.ts` calcula el contraste WCAG de 170 pares desde `tokens.css` (texto ≥ 4.5:1, bordes y foco ≥ 3:1, claro y oscuro); Vitest procesa `tokens.css` (`test.css.include`) para que `?raw` no llegue vacío | `accessibility.md › Vision`: 4.5:1 en texto ≤ 17 pt, en ambas apariencias; conservar el azul y rojo de sistema en los rellenos |
 | 2026-11-13 | **Accesibilidad (T7.1/T7.2)**: `PageHeader` fija `document.title` ("<página> · Mi-lab", `useDocumentTitle`); `RouteAnnouncer` anuncia la página tras navegar y lleva el foco a `<main>` si la página anterior se desmontó bajo él (cerrar `/entrada` o `/salida` vuelve a `<main>`, no al botón: pendiente, requiere rutas modales); ruta `*` → `NotFoundPage`. `Table` es una región con nombre y `tabIndex=0` solo mientras desborda en horizontal. Los errores de guardado de Entrada/Salida se muestran en el formulario (`FormError`, `role="alert"`), no en un toast que quedaría bajo la sheet; un envío inválido enfoca el primer campo con `aria-invalid` (`useFocusFirstInvalid`). ⌘Z/Ctrl+Z ejecuta el "Deshacer" del toast más reciente (no en campos de texto ni con diálogo abierto). Pruebas de punta a punta en `features/shell/a11y.test.tsx` | Revisión con la skill `apple-design`; detalle y pendientes en `docs/REVIEW.md` |
