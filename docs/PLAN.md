@@ -687,7 +687,7 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
   contraste de todos los badges en claro/oscuro, `lang="es"` en `<html>`.
 - [ ] **T7.3** Rendimiento: `npm run build` < 250 kB gzip JS; rutas con `React.lazy`; tablas de
   > 200 filas sin lag (memoizar filas).
-- [ ] **T7.4** Guion de demo en `docs/DEMO.md`: 5 minutos mostrando (1) Resumen con lotes por
+- [x] **T7.4** Guion de demo en `docs/DEMO.md`: 5 minutos mostrando (1) Resumen con lotes por
   vencer, (2) salida FEFO que toma el lote correcto, (3) intento de override con advertencia,
   (4) entrada de lote nuevo, (5) lista de compras exportada.
 
