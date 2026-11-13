@@ -1,0 +1,20 @@
+@layer theme, base, components, utilities;
+
+@layer components {
+  .toast {
+    animation: toast-in var(--duration-base) var(--ease);
+  }
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(var(--space-2));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toast {
+      animation-duration: 0.01ms !important;
+    }
+  }
+}
