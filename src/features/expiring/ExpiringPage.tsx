@@ -7,6 +7,7 @@ import { useExpiringLots } from '@/state/selectors';
 import { useInventoryStore } from '@/state/store';
 import { Button, EmptyState, List, PageHeader, SegmentedControl, Stat } from '@/ui';
 import { PageActions } from '../shared/PageActions';
+import { useWriteOff, type WriteOffTarget } from '../shared/useWriteOff';
 import { ExpiryBadge } from '../shared/StatusBadges';
 
 /** `?filtro=` values (Spanish, they are part of the URL the dashboard links to) ↔ filters. */
@@ -85,6 +86,7 @@ export function ExpiringPage() {
   const criticalDays = useInventoryStore((s) => s.data.settings.criticalDays);
   const warningDays = useInventoryStore((s) => s.data.settings.warningDays);
   const allLots = useExpiringLots();
+  const { requestWriteOff, dialog: writeOffDialog } = useWriteOff();
 
   const filter = filterFromParam(searchParams.get('filtro'));
   const options = useMemo(
@@ -149,18 +151,25 @@ export function ExpiringPage() {
             {groups.map((group) => (
               <List key={group.key} header={group.label}>
                 {group.lots.map((item) => (
-                  <ExpiringRow key={item.lot.id} item={item} />
+                  <ExpiringRow key={item.lot.id} item={item} onWriteOff={requestWriteOff} />
                 ))}
               </List>
             ))}
           </div>
         </>
       )}
+      {writeOffDialog}
     </>
   );
 }
 
-const ExpiringRow = memo(function ExpiringRow({ item }: { item: ExpiringLot }) {
+const ExpiringRow = memo(function ExpiringRow({
+  item,
+  onWriteOff,
+}: {
+  item: ExpiringLot;
+  onWriteOff: (target: WriteOffTarget) => void;
+}) {
   const navigate = useNavigate();
   const { lot, product, areaName, balance, daysLeft, status, value, projectedWaste } = item;
   const waste = Math.floor(projectedWaste);
@@ -195,7 +204,26 @@ const ExpiringRow = memo(function ExpiringRow({ item }: { item: ExpiringLot }) {
           </span>
         </span>
       </Link>
-      {status === 'expired' ? null : (
+      {status === 'expired' ? (
+        <div className="px-4 pb-2 desktop:py-2 desktop:ps-0">
+          <Button
+            size="sm"
+            variant="destructive"
+            aria-label={`Dar de baja ${product.name}, lote ${lot.lotNumber}`}
+            onClick={() =>
+              onWriteOff({
+                lotId: lot.id,
+                lotNumber: lot.lotNumber,
+                productName: product.name,
+                unit: product.unit,
+                balance,
+              })
+            }
+          >
+            Dar de baja
+          </Button>
+        </div>
+      ) : (
         <div className="px-4 pb-2 desktop:py-2 desktop:ps-0">
           <Button
             size="sm"

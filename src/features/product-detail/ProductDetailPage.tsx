@@ -1,8 +1,10 @@
-import { ChevronLeft, PackageSearch } from 'lucide-react';
+import { ChevronLeft, PackageSearch, Pencil } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useProductRows, useToday } from '@/state/selectors';
 import { useInventoryStore } from '@/state/store';
-import { EmptyState, PageHeader } from '@/ui';
+import { Button, EmptyState, PageHeader } from '@/ui';
+import { EditProductSheet } from '../shared/EditProductSheet';
 import { PageActions } from '../shared/PageActions';
 import { LedgerSection } from './LedgerSection';
 import { LotsSection } from './LotsSection';
@@ -18,6 +20,7 @@ export function ProductDetailPage() {
   const fundingSources = useInventoryStore((state) => state.data.fundingSources);
   const settings = useInventoryStore((state) => state.data.settings);
   const row = rows.find((candidate) => candidate.product.id === id);
+  const [editing, setEditing] = useState(false);
 
   if (!row) {
     return (
@@ -49,12 +52,23 @@ export function ProductDetailPage() {
           <ChevronLeft aria-hidden="true" size={18} />
           Productos
         </Link>
-        <PageHeader title={product.name} actions={<PageActions productId={product.id} />} />
+        <PageHeader
+          title={product.name}
+          actions={
+            <>
+              <PageActions productId={product.id} />
+              <Button variant="plain" icon={Pencil} onClick={() => setEditing(true)}>
+                Editar
+              </Button>
+            </>
+          }
+        />
         <p className="-mt-4 text-callout text-label-secondary">{identifiers.join(' · ')}</p>
       </div>
       <ProductMetrics row={row} />
       <LotsSection row={row} today={today} settings={settings} fundingSources={fundingSources} />
       <LedgerSection productId={product.id} fundingSources={fundingSources} />
+      <EditProductSheet product={product} open={editing} onClose={() => setEditing(false)} />
     </div>
   );
 }

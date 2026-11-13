@@ -1,9 +1,12 @@
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
+import { ToastProvider } from '@/ui';
 import { buildSeed } from '@/data/seed/buildSeed';
 import type { InventoryData, Lot, Movement, Settings } from '@/domain/types';
 import { useInventoryStore } from '@/state/store';
+import { lotBalance } from '@/domain/stock';
+import { installDialogPolyfill } from '@/test/dialog-polyfill';
 import { sampleData } from '@/test/fixtures';
 import { ExpiringPage } from './ExpiringPage';
 
@@ -60,6 +63,8 @@ function dataset(settings: Partial<Settings> = {}): InventoryData {
   };
 }
 
+beforeAll(installDialogPolyfill);
+
 function setData(data: InventoryData) {
   act(() => useInventoryStore.setState({ status: 'ready', loadError: undefined, data }));
 }
@@ -72,11 +77,13 @@ function Location() {
 function renderPage(path = '/vencimientos') {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/vencimientos" element={<ExpiringPage />} />
-        <Route path="*" element={<Location />} />
-      </Routes>
-      <Location />
+      <ToastProvider>
+        <Routes>
+          <Route path="/vencimientos" element={<ExpiringPage />} />
+          <Route path="*" element={<Location />} />
+        </Routes>
+        <Location />
+      </ToastProvider>
     </MemoryRouter>,
   );
 }
@@ -219,10 +226,50 @@ describe('ExpiringPage', () => {
     expect(screen.getAllByTestId('location')[0]).toHaveTextContent('/salida?producto=p1&lote=B');
   });
 
-  it('offers no actions on expired lots', () => {
+  it('expired lots offer "Dar de baja" instead of "Registrar salida"', () => {
     renderPage('/vencimientos?filtro=vencidos');
     expect(screen.queryByRole('button', { name: /Registrar salida de/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Dar de baja/ })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Dar de baja Glucosa, lote LT-A' }),
+    ).toBeInTheDocument();
+  });
+
+  describe('writing off an expired lot', () => {
+    const balanceOfA = () => {
+      const { data } = useInventoryStore.getState();
+      return lotBalance(
+        data.lots.find((l) => l.id === 'A')!,
+        data.movements,
+      );
+    };
+
+    it('asks for confirmation first, and cancelling changes nothing', async () => {
+      const user = userEvent.setup();
+      renderPage('/vencimientos?filtro=vencidos');
+      await user.click(screen.getByRole('button', { name: 'Dar de baja Glucosa, lote LT-A' }));
+      const alert = screen.getByRole('alertdialog', { name: '¿Dar de baja el lote LT-A?' });
+      expect(alert).toHaveTextContent(
+        'Se retirarán 10 pruebas vencidas de Glucosa del inventario.',
+      );
+      await user.click(within(alert).getByRole('button', { name: 'Cancelar' }));
+      expect(balanceOfA()).toBe(10);
+    });
+
+    it('removes the whole balance, shows a toast and can be undone', async () => {
+      const user = userEvent.setup();
+      renderPage('/vencimientos?filtro=vencidos');
+      await user.click(screen.getByRole('button', { name: 'Dar de baja Glucosa, lote LT-A' }));
+      await user.click(
+        within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Dar de baja' }),
+      );
+      expect(balanceOfA()).toBe(0);
+      expect(
+        await screen.findByText('Baja registrada · Glucosa · Lote LT-A · 10 pruebas'),
+      ).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Deshacer' }));
+      expect(balanceOfA()).toBe(10);
+    });
   });
 
   it.each([

@@ -671,9 +671,9 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 - [x] **T5.2** Sheet "Registrar salida" con vista previa FEFO en vivo, override con motivo,
   ruta `/salida`, toast con deshacer. Preselección de producto/lote desde otras pantallas vía
   query string (`/salida?producto=<id>&lote=<id>`).
-- [ ] **T5.3** "Dar de baja" lotes vencidos (alerta destructiva) y ajuste de inventario
+- [x] **T5.3** "Dar de baja" lotes vencidos (alerta destructiva) y ajuste de inventario
   (desde detalle de lote, motivo obligatorio).
-- [ ] **T5.4** Editar producto (sheet) — mín/máx/consumo/unidades por presentación.
+- [x] **T5.4** Editar producto (sheet) — mín/máx/consumo/unidades por presentación.
 
 ### Fase 6 — Imprimir, respaldo, ajustes
 - [~] **T6.1** ~~Exportar CSV: lista de productos, kardex de un producto, pedido de compra.~~ Diferida (ver §12).
@@ -756,4 +756,5 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 | 2026-11-13 | Resumen y Vencimientos (T4.6, T4.4): las tarjetas del Resumen son enlaces (`Stat as={Link}`) a `/vencimientos?filtro=criticos\|vencidos\|todos` y `/compras`; Vencimientos lee el filtro de `?filtro=` (por defecto *Todos*, conserva otros parámetros, `replace`), agrupa por mes con `formatToParts` ("noviembre 2026") y su fila es un `<li>` con `Link` y botón hermanos (no `ListRow`, para no anidar interactivos); "Dar de baja" lo agrega T5.3 | Decisiones de implementación |
 | 2026-11-13 | Entrada (T5.1): `/entrada` muestra un `Sheet` sobre una página con el título; al cerrar vuelve atrás (o a `/` si se abrió por enlace directo, `useCloseSheet`). El producto se elige con `ProductPicker` (autocompletar nativo `<datalist>`, ignora mayúsculas y acentos; `?producto=` lo preselecciona). La cantidad admite unidad base o cajas; el precio es USD por unidad base (acepta coma decimal). Un vencimiento ≤ `criticalDays` pide un segundo clic ("Registrar de todos modos"); un lote que vence antes que el stock actual muestra la nota informativa. El toast "Entrada registrada · …" trae "Deshacer" (5 s) | Decisiones de implementación de T5.1 |
 | 2026-11-13 | Salida (T5.2): `/salida?producto=&lote=`; vista previa FEFO en vivo ("12 de LT004512 · vence en 9 días", nunca lotes vencidos); "Elegir lote manualmente" muestra un `Select` de lotes con saldo y no vencidos (el FEFO marcado "sugerido"); elegir otro lote muestra el aviso naranja y exige "Motivo"; si el lote de la URL no se puede usar, cae al lote FEFO. Toast "Salida registrada · …" con "Deshacer" | Decisiones de implementación de T5.2 |
+| 2026-11-13 | Baja, ajuste y edición (T5.3, T5.4): componentes compartidos en `features/shared` — `useWriteOff` (alerta destructiva, retira el saldo completo, toast con "Deshacer"), `useAdjust` (sheet: aumentar/disminuir + motivo obligatorio; no deja el lote en negativo) y `EditProductSheet` (nombre, área, unidad base, presentación, unidades por presentación, mín, máx, consumo manual, código, nº de tarjeta; un campo vacío elimina el valor; máx ≥ mín). "Dar de baja" aparece en Vencimientos y en los lotes vencidos del detalle; "Ajustar" y "Editar" en el detalle del producto. Las pantallas que los usan requieren `ToastProvider` (lo da `Shell`) | Decisiones de implementación |
 | 2026-11-13 | Tarjeta de Urea renumerada a LRC-07-24 en el seed | El original duplica LRC-06-24 |

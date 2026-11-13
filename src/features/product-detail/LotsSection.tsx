@@ -6,7 +6,9 @@ import type { LotBalance } from '@/domain/stock';
 import type { FundingSource, ISODate, Settings } from '@/domain/types';
 import { EMPTY, formatDate, formatQuantity } from '@/lib/format';
 import type { ProductRow } from '@/state/derive';
-import { Badge, Table, type TableColumn } from '@/ui';
+import { Badge, Button, Table, type TableColumn } from '@/ui';
+import { useAdjust } from '../shared/useAdjust';
+import { useWriteOff } from '../shared/useWriteOff';
 import { ExpiryBadge } from '../shared/StatusBadges';
 import { sourceName } from './sourceName';
 
@@ -32,6 +34,55 @@ export function LotsSection({ row, today, settings, fundingSources }: LotsSectio
   const usable = withBalance.filter(({ lot }) => lot.expiryDate >= today);
   const expired = withBalance.filter(({ lot }) => lot.expiryDate < today);
   const firstId = firstFefoLot(row.stock.lots, today)?.lot.id;
+  const { requestAdjust, dialog: adjustDialog } = useAdjust();
+  const { requestWriteOff, dialog: writeOffDialog } = useWriteOff();
+  const target = ({ lot, balance }: LotBalance) => ({
+    lotId: lot.id,
+    lotNumber: lot.lotNumber,
+    productName: row.product.name,
+    unit: row.product.unit,
+    balance,
+  });
+  const adjustColumn: TableColumn<LotBalance> = {
+    key: 'adjust',
+    header: 'Acciones',
+    className: 'whitespace-nowrap',
+    cell: (entry) => (
+      <Button
+        size="sm"
+        variant="plain"
+        aria-label={`Ajustar saldo del lote ${entry.lot.lotNumber}`}
+        onClick={() => requestAdjust(target(entry))}
+      >
+        Ajustar
+      </Button>
+    ),
+  };
+  const writeOffColumn: TableColumn<LotBalance> = {
+    key: 'actions',
+    header: 'Acciones',
+    className: 'whitespace-nowrap',
+    cell: (entry) => (
+      <span className="flex items-center gap-1">
+        <Button
+          size="sm"
+          variant="destructive"
+          aria-label={`Dar de baja el lote ${entry.lot.lotNumber}`}
+          onClick={() => requestWriteOff(target(entry))}
+        >
+          Dar de baja
+        </Button>
+        <Button
+          size="sm"
+          variant="plain"
+          aria-label={`Ajustar saldo del lote ${entry.lot.lotNumber}`}
+          onClick={() => requestAdjust(target(entry))}
+        >
+          Ajustar
+        </Button>
+      </span>
+    ),
+  };
 
   const expiryCell = ({ lot }: LotBalance) => (
     <ExpiryBadge
@@ -90,6 +141,7 @@ export function LotsSection({ row, today, settings, fundingSources }: LotsSectio
       className: 'min-w-56',
       cell: ({ lot }) => projectionText(row, lot.id),
     },
+    adjustColumn,
   ];
 
   return (
@@ -109,12 +161,14 @@ export function LotsSection({ row, today, settings, fundingSources }: LotsSectio
           <h3 className="text-headline font-semibold text-label">Vencidos</h3>
           <Table
             caption="Lotes vencidos con saldo"
-            columns={baseColumns}
+            columns={[...baseColumns, writeOffColumn]}
             rows={expired}
             getRowKey={({ lot }) => lot.id}
           />
         </>
       ) : null}
+      {adjustDialog}
+      {writeOffDialog}
     </section>
   );
 }
