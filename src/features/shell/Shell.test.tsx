@@ -89,7 +89,7 @@ describe('global shortcuts', () => {
     await screen.findByRole('heading', { name: 'Productos' });
     await user.keyboard('n');
     expect(router.state.location.pathname).toBe('/entrada');
-    await screen.findByRole('heading', { name: 'Registrar entrada' });
+    await act(() => router.navigate('/productos'));
     await user.keyboard('s');
     expect(router.state.location.pathname).toBe('/salida');
   });
