@@ -60,8 +60,10 @@ export function GeneralSettingsForm() {
     setSubmitted(false);
   }
 
-  const set = <K extends keyof Drafts>(key: K) => (value: Drafts[K]) =>
-    setDrafts((current) => ({ ...current, [key]: value }));
+  const set =
+    <K extends keyof Drafts>(key: K) =>
+    (value: Drafts[K]) =>
+      setDrafts((current) => ({ ...current, [key]: value }));
 
   const errors = validate(drafts);
   const shown = (field: keyof Drafts) => (submitted ? errors[field] : undefined);

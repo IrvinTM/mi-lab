@@ -52,12 +52,12 @@ describe('SettingsPage', () => {
     expect(screen.getByLabelText('Nombre del laboratorio')).toHaveValue('Laboratorio clínico');
     expect(screen.getByLabelText('Días para estado crítico')).toHaveValue('30');
     expect(screen.getByLabelText('Días para advertencia')).toHaveValue('90');
-    expect(
-      screen.getByLabelText('Existencia mínima por defecto (meses de consumo)'),
-    ).toHaveValue('1');
-    expect(
-      screen.getByLabelText('Existencia máxima por defecto (meses de consumo)'),
-    ).toHaveValue('3');
+    expect(screen.getByLabelText('Existencia mínima por defecto (meses de consumo)')).toHaveValue(
+      '1',
+    );
+    expect(screen.getByLabelText('Existencia máxima por defecto (meses de consumo)')).toHaveValue(
+      '3',
+    );
     expect(document.body.textContent).not.toMatch(/NaN|Infinity/);
   });
 
@@ -107,9 +107,7 @@ describe('SettingsPage', () => {
 
       expect(screen.getByText('Escribe el nombre del laboratorio.')).toBeInTheDocument();
       expect(screen.getAllByText('Ingresa un número entero de 1 o más.')).toHaveLength(2);
-      expect(
-        screen.getByText('El máximo no puede ser menor que el mínimo.'),
-      ).toBeInTheDocument();
+      expect(screen.getByText('El máximo no puede ser menor que el mínimo.')).toBeInTheDocument();
       expect(screen.getByLabelText('Días para estado crítico')).toHaveAttribute(
         'aria-invalid',
         'true',
@@ -337,10 +335,9 @@ describe('SettingsPage', () => {
 
       await user.click(screen.getByRole('button', { name: 'Eliminar Hematología' }));
       await user.click(
-        within(screen.getByRole('alertdialog', { name: '¿Eliminar el área Hematología?' })).getByRole(
-          'button',
-          { name: 'Eliminar' },
-        ),
+        within(
+          screen.getByRole('alertdialog', { name: '¿Eliminar el área Hematología?' }),
+        ).getByRole('button', { name: 'Eliminar' }),
       );
       expect(useInventoryStore.getState().data.areas.map((a) => a.id)).toEqual(['a1']);
       expect(screen.getByText('Área eliminada · Hematología')).toBeInTheDocument();

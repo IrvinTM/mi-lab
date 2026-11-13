@@ -123,6 +123,37 @@ describe('Toast', () => {
     expect(screen.queryByText('Uno')).not.toBeInTheDocument();
   });
 
+  it('⌘Z / Ctrl+Z runs the newest "Deshacer" without reaching the toast', async () => {
+    const onAction = vi.fn();
+    const user = userEvent.setup();
+    setup({ message: 'Salida registrada', action: { label: 'Deshacer', onAction } });
+    await user.click(screen.getByRole('button', { name: 'Mostrar' }));
+    await user.keyboard('{Control>}z{/Control}');
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Salida registrada')).not.toBeInTheDocument();
+  });
+
+  it('leaves ⌘Z to a text field that has the focus', async () => {
+    const onAction = vi.fn();
+    const user = userEvent.setup();
+    setup({ message: 'Salida registrada', action: { label: 'Deshacer', onAction } });
+    await user.click(screen.getByRole('button', { name: 'Mostrar' }));
+    const field = document.body.appendChild(document.createElement('input'));
+    field.focus();
+    await user.keyboard('{Meta>}z{/Meta}');
+    expect(onAction).not.toHaveBeenCalled();
+    field.remove();
+  });
+
+  it('sits above the tab bar below 900 px and at the bottom edge on desktop', () => {
+    setup();
+    const region = document.querySelector('[aria-live]');
+    expect(region?.className).toContain(
+      'bottom-[calc(var(--tabbar-height)+env(safe-area-inset-bottom))]',
+    );
+    expect(region).toHaveClass('desktop:bottom-0');
+  });
+
   it('dismisses with the close button', () => {
     setup({ message: 'Uno' });
     trigger();

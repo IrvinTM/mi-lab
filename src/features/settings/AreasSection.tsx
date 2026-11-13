@@ -57,7 +57,8 @@ export function AreasSection() {
 
   const counts = useMemo(() => {
     const byArea = new Map<string, number>();
-    for (const product of products) byArea.set(product.areaId, (byArea.get(product.areaId) ?? 0) + 1);
+    for (const product of products)
+      byArea.set(product.areaId, (byArea.get(product.areaId) ?? 0) + 1);
     return byArea;
   }, [products]);
 
@@ -123,7 +124,11 @@ export function AreasSection() {
         })}
       </List>
 
-      <form onSubmit={add} noValidate className="flex flex-col gap-2 sheet:flex-row sheet:items-start">
+      <form
+        onSubmit={add}
+        noValidate
+        className="flex flex-col gap-2 sheet:flex-row sheet:items-start"
+      >
         <TextField
           className="flex-1"
           label="Nueva área"

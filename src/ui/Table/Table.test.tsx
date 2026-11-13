@@ -200,4 +200,39 @@ describe('Table', () => {
     );
     expect(screen.queryByText('Sin productos')).not.toBeInTheDocument();
   });
+
+  describe('horizontal scroll on narrow screens', () => {
+    beforeEach(() => {
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          constructor(private readonly callback: () => void) {}
+          observe() {
+            this.callback();
+          }
+          disconnect() {}
+        },
+      );
+    });
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      // jsdom defines scrollWidth on Element.prototype; drop the override.
+      delete (HTMLElement.prototype as { scrollWidth?: number }).scrollWidth;
+    });
+
+    it('is a named, focusable region only while it overflows', () => {
+      Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+        configurable: true,
+        get: () => 800,
+      });
+      render(<Table caption="Lotes" columns={columns} rows={products} getRowKey={(p) => p.id} />);
+      const region = screen.getByRole('region', { name: 'Lotes' });
+      expect(region).toHaveAttribute('tabindex', '0');
+    });
+
+    it('adds no Tab stop when the table fits', () => {
+      render(<Table caption="Lotes" columns={columns} rows={products} getRowKey={(p) => p.id} />);
+      expect(screen.queryByRole('region')).not.toBeInTheDocument();
+    });
+  });
 });

@@ -33,11 +33,7 @@ export function SimulatedDateSection() {
         </div>
       ) : null}
       <div>
-        <Button
-          variant="tinted"
-          disabled={!todayOverride}
-          onClick={() => setOverride(undefined)}
-        >
+        <Button variant="tinted" disabled={!todayOverride} onClick={() => setOverride(undefined)}>
           Usar la fecha real
         </Button>
       </div>

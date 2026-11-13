@@ -10,7 +10,7 @@ export interface AlertProps {
   /** Verb that names the result ("Dar de baja"), never "OK". */
   confirmLabel: string;
   cancelLabel?: string;
-  /** Red confirm label, and the initial focus (and the visual emphasis) goes to Cancel. */
+  /** Red confirm label; the initial focus goes to Cancel (both buttons keep the same weight). */
   destructive?: boolean;
   onConfirm: () => void;
   /** Cancel button and Esc. The backdrop does not dismiss an alert. */
@@ -63,12 +63,7 @@ export function Alert({
         </div>
         {/* Cancel leads and the action trails. A destructive action is never the prominent one. */}
         <div className="grid grid-cols-2 gap-2 px-4 pb-4">
-          <Button
-            ref={cancelRef}
-            variant={destructive ? 'tinted' : 'plain'}
-            fullWidth
-            onClick={onCancel}
-          >
+          <Button ref={cancelRef} variant="plain" fullWidth onClick={onCancel}>
             {cancelLabel}
           </Button>
           <Button
