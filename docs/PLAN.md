@@ -658,12 +658,12 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 ### Fase 4 — Pantallas de lectura
 - [x] **T4.1** Router + `AppShell` con las rutas de §8.4 (páginas vacías con título) y atajos
   de teclado globales.
-- [ ] **T4.2** Productos (`/productos`): búsqueda, filtro por área y estado, tabla ordenable,
+- [x] **T4.2** Productos (`/productos`): búsqueda, filtro por área y estado, tabla ordenable,
   versión móvil en lista, estado vacío.
-- [ ] **T4.3** Detalle de producto: encabezado, métricas, tabla de lotes FEFO con proyección,
+- [x] **T4.3** Detalle de producto: encabezado, métricas, tabla de lotes FEFO con proyección,
   kardex.
 - [x] **T4.4** Vencimientos (`/vencimientos`).
-- [ ] **T4.5** Compras (`/compras`) (sin selección ni cantidades editables: solo servían para exportar).
+- [x] **T4.5** Compras (`/compras`) (sin selección ni cantidades editables: solo servían para exportar).
 - [x] **T4.6** Resumen (`/`).
 
 ### Fase 5 — Pantallas de escritura
