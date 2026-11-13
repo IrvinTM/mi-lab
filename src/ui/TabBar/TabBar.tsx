@@ -13,6 +13,7 @@ interface TabBarProps {
 export function TabBar({ items, className }: TabBarProps) {
   return (
     <nav
+      data-print="hide"
       aria-label="Secciones"
       className={`fixed inset-x-0 bottom-0 z-10 flex border-t border-separator bg-bg-elevated ${className ?? ''}`.trim()}
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}

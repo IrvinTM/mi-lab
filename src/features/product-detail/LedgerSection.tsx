@@ -1,10 +1,12 @@
-import { TriangleAlert } from 'lucide-react';
+import { Printer, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import type { LedgerEntry, LedgerRow } from '@/domain/ledger';
 import type { FundingSource } from '@/domain/types';
 import { EMPTY, formatCoverage, formatCurrency, formatDate, formatNumber } from '@/lib/format';
+import type { ProductRow } from '@/state/derive';
 import { useLedger } from '@/state/selectors';
 import { Button, DateField, Table, type TableColumn } from '@/ui';
+import { PrintableLedger } from './PrintableLedger';
 import { sourceName } from './sourceName';
 
 function quantityCell(entry: LedgerEntry | undefined) {
@@ -26,15 +28,15 @@ function quantityCell(entry: LedgerEntry | undefined) {
  * follows from the one above it. Newest-first would make the balance column run backwards.
  */
 export function LedgerSection({
-  productId,
+  row: productRow,
   fundingSources,
 }: {
-  productId: string;
+  row: ProductRow;
   fundingSources: readonly FundingSource[];
 }) {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const rows = useLedger(productId, { from: from || undefined, to: to || undefined });
+  const rows = useLedger(productRow.product.id, { from: from || undefined, to: to || undefined });
   const filtered = from !== '' || to !== '';
   const invertedRange = from !== '' && to !== '' && from > to;
 
@@ -99,9 +101,19 @@ export function LedgerSection({
 
   return (
     <section aria-labelledby="ledger-heading" className="flex flex-col gap-3">
-      <h2 id="ledger-heading" className="text-title3 font-semibold text-label">
-        Kardex
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="ledger-heading" className="text-title3 font-semibold text-label">
+          Kardex
+        </h2>
+        <Button
+          variant="plain"
+          icon={Printer}
+          disabled={rows.length === 0}
+          onClick={() => window.print()}
+        >
+          Imprimir
+        </Button>
+      </div>
       <div className="flex flex-wrap items-end gap-3">
         <DateField label="Desde" value={from} onChange={setFrom} max={to || undefined} />
         <DateField
@@ -128,6 +140,13 @@ export function LedgerSection({
         rows={rows}
         getRowKey={(entry) => entry.movementId}
         empty={filtered ? 'No hay movimientos en estas fechas.' : 'Aún no hay movimientos.'}
+      />
+      <PrintableLedger
+        row={productRow}
+        rows={rows}
+        from={from || undefined}
+        to={to || undefined}
+        fundingSources={fundingSources}
       />
     </section>
   );

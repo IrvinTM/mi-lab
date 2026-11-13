@@ -24,6 +24,7 @@ export function AppShell({ title, items, settings, notice, children }: AppShellP
   return (
     <div className="min-h-screen desktop:flex">
       <a
+        data-print="hide"
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:start-3 focus:top-3 focus:z-20 focus:rounded-sm focus:bg-bg-elevated focus:px-4 focus:py-2 focus:text-body"
       >
@@ -39,7 +40,10 @@ export function AppShell({ title, items, settings, notice, children }: AppShellP
       />
 
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-separator bg-bg-elevated ps-4 desktop:hidden">
+        <header
+          data-print="hide"
+          className="sticky top-0 z-10 flex items-center justify-between border-b border-separator bg-bg-elevated ps-4 desktop:hidden"
+        >
           <p className="truncate text-headline font-semibold text-label">{title}</p>
           {settings && SettingsIcon ? (
             <NavLink
@@ -51,7 +55,11 @@ export function AppShell({ title, items, settings, notice, children }: AppShellP
             </NavLink>
           ) : null}
         </header>
-        {notice ? <div className="desktop:hidden">{notice}</div> : null}
+        {notice ? (
+          <div data-print="hide" className="desktop:hidden">
+            {notice}
+          </div>
+        ) : null}
 
         <main
           id="main"

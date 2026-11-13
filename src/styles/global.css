@@ -34,3 +34,85 @@
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Print: the kardex as a paper stock-control card (MINSAL "Tarjeta de control de existencias").
+ * The card is `PrintableLedger` (`data-print="card"`), hidden on screen. When the page has one,
+ * everything that is neither the card nor one of its ancestors is removed from the page, so no
+ * blank pages are left behind. Pages without a card print normally, minus the navigation
+ * (`data-print="hide"`). Black on white only: no colors, backgrounds or shadows, whatever the
+ * appearance. These literal values are intentional: paper has no light/dark scheme.
+ */
+@page {
+  margin: 12mm;
+}
+
+@page kardex {
+  /* No paper size: the browser keeps the user's (Letter or A4); the table has 11 columns. */
+  size: landscape;
+  margin: 12mm;
+}
+
+@media print {
+  [data-print='hide'] {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  body:has([data-print='card'])
+    :not(:has([data-print='card']), [data-print='card'], [data-print='card'] *) {
+    display: none !important;
+  }
+
+  /* Ancestors of the card: plain block boxes, no padding, limits or fixed heights. */
+  body:has([data-print='card']) :has([data-print='card']) {
+    display: block !important;
+    position: static !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: none !important;
+    overflow: visible !important;
+  }
+
+  [data-print='card'] {
+    page: kardex;
+    display: block !important;
+    width: 100%;
+  }
+
+  [data-print='card'],
+  [data-print='card'] * {
+    color: black !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  [data-print='table'] {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  [data-print='table'] th,
+  [data-print='table'] td {
+    border: 0.5pt solid black;
+  }
+
+  /* Repeat the column headings on every page and never split a row across two. */
+  [data-print='table'] thead {
+    display: table-header-group;
+  }
+
+  [data-print='table'] tr {
+    break-inside: avoid;
+  }
+}

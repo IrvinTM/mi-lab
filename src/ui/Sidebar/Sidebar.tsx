@@ -52,6 +52,7 @@ export function SidebarLink({ item }: { item: NavItem }) {
 export function Sidebar({ title, items, footerItems = [], notice, className }: SidebarProps) {
   return (
     <aside
+      data-print="hide"
       className={`sticky top-0 h-screen w-60 shrink-0 flex-col gap-1 border-e border-separator bg-bg-secondary p-3 ${className ?? 'flex'}`.trim()}
     >
       <p className="truncate px-3 pb-3 pt-2 text-headline font-semibold text-label">{title}</p>
