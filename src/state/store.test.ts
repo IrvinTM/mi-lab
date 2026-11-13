@@ -324,15 +324,13 @@ describe('issue', () => {
 
     it('choosing the FEFO lot by hand is not an override', async () => {
       const { store } = await readyStore();
-      store
-        .getState()
-        .issue({
-          productId: 'p1',
-          date: TODAY,
-          quantity: 5,
-          lotId: 'soon',
-          fefoOverrideReason: 'ignorado',
-        });
+      store.getState().issue({
+        productId: 'p1',
+        date: TODAY,
+        quantity: 5,
+        lotId: 'soon',
+        fefoOverrideReason: 'ignorado',
+      });
       expect(store.getState().data.movements.at(-1)?.fefoOverrideReason).toBeUndefined();
     });
 
@@ -340,15 +338,13 @@ describe('issue', () => {
       const { store } = await readyStore();
       expect(
         failureOf(
-          store
-            .getState()
-            .issue({
-              productId: 'p1',
-              date: TODAY,
-              quantity: 1,
-              lotId: 'old',
-              fefoOverrideReason: 'x',
-            }),
+          store.getState().issue({
+            productId: 'p1',
+            date: TODAY,
+            quantity: 1,
+            lotId: 'old',
+            fefoOverrideReason: 'x',
+          }),
         ).errors.lotId,
       ).toMatch(/vencido/);
       expect(
