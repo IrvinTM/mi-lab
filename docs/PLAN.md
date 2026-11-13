@@ -618,7 +618,7 @@ claro/oscuro, ancho 375 px y 1280 px, y navegación solo con teclado.
 - [x] **T1.3** `fefo.ts` + tests (§6.3, todos los casos listados).
 - [x] **T1.4** `expiry.ts` + tests (§6.4, bordes 0, 30, 31, 90, 91 días, −1).
 - [x] **T1.5** `consumption.ts` + tests (§6.7).
-- [ ] **T1.6** `projection.ts` + tests (§6.5). Casos: consumo alto → sin pérdida; lote lejano
+- [x] **T1.6** `projection.ts` + tests (§6.5). Casos: consumo alto → sin pérdida; lote lejano
   detrás de uno grande → pérdida parcial; consumo 0 → `null`; lote que vence antes de que se
   agote el anterior → pérdida total.
 - [ ] **T1.7** `reorder.ts` + tests (§6.8, incluye redondeo a cajas y `unknown`).
@@ -735,4 +735,5 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 | 2026-11-13 | `allocateFefo` lanza `RangeError` si la cantidad no es positiva y finita (la validación de formularios la rechaza antes); ignora lotes con saldo ≤ 0. Se agrega `firstFefoLot(lots, today)` para que la UI detecte un override (lote elegido ≠ primero FEFO) | La cantidad inválida es un bug del llamador, no un resultado de negocio; el override de §6.3 necesita saber cuál es el lote FEFO |
 | 2026-11-13 | La exportación a CSV (T6.1, `lib/csv.ts`, botones de exportar y selección/cantidades editables en Compras) sale del MVP. Se mantienen respaldo/restauración JSON e imprimir kardex | Decisión del usuario; el respaldo JSON protege los datos locales |
 | 2026-11-13 | Consumo (§6.7): ventana = `months` meses calendario hasta hoy, (hoy − 3 meses, hoy]; solo movimientos `issue` de ese producto con fecha ≤ hoy; divisor = días de historial desde la primera salida ÷ 30.4375, con tope en `months` (si hay < 1 mes de historial → `null`). `effectiveAvg` devuelve `{ value, source: 'calculated' \| 'manual', months? }` o `null`; un calculado de 0 cae al manual y un manual ≤ 0 se trata como sin consumo | §6.7 no definía "meses completos" ni el divisor con historial corto; no diluir el promedio y nunca devolver 0 que cause divisiones por cero |
+| 2026-11-13 | Proyección (§6.5): `projectExpiry(lots, avgMonthlyConsumption, today)` devuelve `{ lots[{ lotId, projectedUsed, projectedWaste, runsOutOn }], totalWaste, effectiveCoverageMonths }` o `null` sin consumo (≤ 0 o `null`); solo lotes usables con saldo, en orden FEFO; `runsOutOn` redondea hacia arriba los días; la rama `rate <= 0` del pseudocódigo no existe porque ese caso devuelve `null` | Coherente con "consumo 0 → null" de T1.6 |
 | 2026-11-13 | Tarjeta de Urea renumerada a LRC-07-24 en el seed | El original duplica LRC-06-24 |
