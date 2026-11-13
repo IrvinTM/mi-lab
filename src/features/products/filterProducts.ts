@@ -2,6 +2,7 @@ import type { ProductRow } from '@/state/derive';
 import type { Lot } from '@/domain/types';
 import type { ReorderStatus } from '@/domain/reorder';
 import type { TableSort } from '@/ui';
+import { normalizeText } from '@/domain/text';
 
 export type StatusFilter = ReorderStatus | 'all';
 export type SortKey = 'name' | 'stock' | 'coverage' | 'expiry' | 'status';
@@ -14,15 +15,6 @@ export interface ProductFilters {
 }
 
 export const DEFAULT_SORT: TableSort = { key: 'name', direction: 'ascending' };
-
-/** Lowercase, accent-free text for case- and accent-insensitive matching. */
-export function normalizeText(text: string): string {
-  return text
-    .normalize('NFD')
-    .replace(/\p{M}+/gu, '')
-    .toLowerCase()
-    .trim();
-}
 
 /** Product id → searchable text of everything typed to find it: name, codes and lot numbers. */
 export function buildSearchIndex(

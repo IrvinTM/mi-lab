@@ -5,6 +5,7 @@ import type { InventoryRepository } from '@/data/repository';
 import { todayISO } from '@/domain/dates';
 import { allocateFefo, firstFefoLot } from '@/domain/fefo';
 import { lotBalance, lotBalances, productStock } from '@/domain/stock';
+import { normalizeText } from '@/domain/text';
 import type { InventoryData, ISODate, Movement, Product, Settings } from '@/domain/types';
 import {
   findExistingLot,
@@ -111,15 +112,6 @@ function failure(errors: Record<string, string>): ActionFailure {
   };
 }
 
-/** Case- and accent-insensitive key to compare names. */
-function nameKey(name: string): string {
-  return name
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .trim()
-    .toLowerCase();
-}
-
 /** Why `name` cannot be an area name, or `undefined` if it can. `exceptId` is the area being renamed. */
 function areaNameError(
   areas: readonly { id: string; name: string }[],
@@ -127,8 +119,8 @@ function areaNameError(
   exceptId?: string,
 ): string | undefined {
   if (!name.trim()) return 'Escribe el nombre del área.';
-  const key = nameKey(name);
-  if (areas.some((a) => a.id !== exceptId && nameKey(a.name) === key)) {
+  const key = normalizeText(name);
+  if (areas.some((a) => a.id !== exceptId && normalizeText(a.name) === key)) {
     return 'Ya existe un área con ese nombre.';
   }
   return undefined;

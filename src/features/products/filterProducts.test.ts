@@ -1,12 +1,7 @@
+import { normalizeText } from '@/domain/text';
 import { buildSeed } from '@/data/seed/buildSeed';
 import { deriveProductRows } from '@/state/derive';
-import {
-  DEFAULT_SORT,
-  buildSearchIndex,
-  filterRows,
-  normalizeText,
-  sortRows,
-} from './filterProducts';
+import { DEFAULT_SORT, buildSearchIndex, filterRows, sortRows } from './filterProducts';
 
 const TODAY = '2026-11-13';
 const data = buildSeed(TODAY);

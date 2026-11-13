@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from 'react';
 import type { Product } from '@/domain/types';
 import { TextField } from '@/ui';
+import { normalizeText } from '@/domain/text';
 
 interface ProductPickerProps {
   label?: string;
@@ -12,14 +13,6 @@ interface ProductPickerProps {
   onChange: (productId: string) => void;
   error?: string;
   autoFocus?: boolean;
-}
-
-function normalize(text: string): string {
-  return text
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .trim()
-    .toLowerCase();
 }
 
 /**
@@ -37,7 +30,7 @@ export function ProductPicker({
 }: ProductPickerProps) {
   const listId = useId();
   const byName = useMemo(
-    () => new Map(products.map((product) => [normalize(product.name), product])),
+    () => new Map(products.map((product) => [normalizeText(product.name), product])),
     [products],
   );
   const [text, setText] = useState(() => products.find((p) => p.id === value)?.name ?? '');
@@ -54,7 +47,7 @@ export function ProductPicker({
         error={error}
         onChange={(next) => {
           setText(next);
-          onChange(byName.get(normalize(next))?.id ?? '');
+          onChange(byName.get(normalizeText(next))?.id ?? '');
         }}
       />
       <datalist id={listId}>
