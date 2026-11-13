@@ -67,6 +67,11 @@ export interface InventoryState {
   /** Deletes those movements and the lots left without movements. False if it would leave a negative balance. */
   undo(movementIds: string[]): boolean;
   upsertProduct(product: Product): void;
+  /** Names are unique ignoring case and accents. */
+  addArea(name: string): ActionResult<{ areaId: string }>;
+  renameArea(id: string, name: string): ActionResult;
+  /** Only areas without products (archived ones included) can be removed. */
+  removeArea(id: string): ActionResult;
   updateSettings(patch: Partial<Settings>): void;
   resetToSeed(): void;
   importBackup(json: unknown): { ok: boolean; error?: string };
@@ -97,6 +102,29 @@ function failure(errors: Record<string, string>): ActionFailure {
     error: Object.values(errors)[0] ?? 'No se pudo completar la acción.',
     errors,
   };
+}
+
+/** Case- and accent-insensitive key to compare names. */
+function nameKey(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .trim()
+    .toLowerCase();
+}
+
+/** Why `name` cannot be an area name, or `undefined` if it can. `exceptId` is the area being renamed. */
+function areaNameError(
+  areas: readonly { id: string; name: string }[],
+  name: string,
+  exceptId?: string,
+): string | undefined {
+  if (!name.trim()) return 'Escribe el nombre del área.';
+  const key = nameKey(name);
+  if (areas.some((a) => a.id !== exceptId && nameKey(a.name) === key)) {
+    return 'Ya existe un área con ese nombre.';
+  }
+  return undefined;
 }
 
 export function createInventoryStore(repository: InventoryRepository, options: StoreOptions = {}) {
@@ -339,6 +367,41 @@ export function createInventoryStore(repository: InventoryRepository, options: S
             ? data.products.map((p) => (p.id === product.id ? product : p))
             : [...data.products, product],
         });
+      },
+
+      addArea(name) {
+        const { data } = get();
+        const error = areaNameError(data.areas, name);
+        if (error) return failure({ name: error });
+        const area = { id: newId(), name: name.trim() };
+        setData({ ...data, areas: [...data.areas, area] });
+        return { ok: true, areaId: area.id };
+      },
+
+      renameArea(id, name) {
+        const { data } = get();
+        if (!data.areas.some((a) => a.id === id)) return failure({ id: 'No se encontró el área.' });
+        const error = areaNameError(data.areas, name, id);
+        if (error) return failure({ name: error });
+        setData({
+          ...data,
+          areas: data.areas.map((a) => (a.id === id ? { ...a, name: name.trim() } : a)),
+        });
+        return { ok: true };
+      },
+
+      removeArea(id) {
+        const { data } = get();
+        const area = data.areas.find((a) => a.id === id);
+        if (!area) return failure({ id: 'No se encontró el área.' });
+        const count = data.products.filter((p) => p.areaId === id).length;
+        if (count > 0) {
+          return failure({
+            id: `No se puede eliminar "${area.name}": tiene ${count} ${count === 1 ? 'producto' : 'productos'}.`,
+          });
+        }
+        setData({ ...data, areas: data.areas.filter((a) => a.id !== id) });
+        return { ok: true };
       },
 
       updateSettings(patch) {
