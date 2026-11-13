@@ -16,6 +16,11 @@
   --font-rounded: ui-rounded, 'SF Pro Rounded', var(--font-sans);
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
+  /* Layout breakpoints: `desktop:` = sidebar layout (≥ 900 px), `sheet:` = centered modal (≥ 600 px). */
+  --breakpoint-*: initial;
+  --breakpoint-sheet: 37.5rem;
+  --breakpoint-desktop: 56.25rem;
+
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
