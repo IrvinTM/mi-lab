@@ -34,7 +34,7 @@ El MVP debe permitir, de punta a punta:
   primero (FEFO)** y avisa si el usuario intenta usar otro.
 - Ver el **kardex** de cada producto (equivalente digital de la tarjeta MINSAL), con saldo y
   cobertura en meses calculados correctamente (sin `#DIV/0!`).
-- Exportar a CSV y respaldar/restaurar los datos en JSON.
+- Respaldar/restaurar los datos en JSON. (La exportación a CSV queda fuera del MVP, ver §12.)
 
 ### Fuera de alcance del MVP (ver §12 "Después del MVP")
 
@@ -143,7 +143,6 @@ src/
     global.css
   lib/
     format.ts              # números, fechas, plural es-SV
-    csv.ts                 # exportación CSV
 ```
 
 Regla de dependencias: `features → ui, state, domain, lib` · `state → data, domain` ·
@@ -516,7 +515,7 @@ fondo tintado al 15 %, no texto amarillo).
 - **Lotes**: tabla ordenada FEFO; el primero marcado **"Usar este primero"**; columnas lote,
   vencimiento + badge, saldo, procedencia, proyección ("se usará por completo" / "≈ 40 pruebas
   se vencerán sin usar"). Lotes vencidos agrupados al final con botón "Dar de baja".
-- **Kardex**: tabla §6.9 con filtros de fecha; botón "Exportar CSV" y "Imprimir" (hoja de estilo
+- **Kardex**: tabla §6.9 con filtros de fecha; botón "Imprimir" (hoja de estilo
   `@media print` que imita la tarjeta MINSAL con encabezado de región/establecimiento).
 - Editar producto (sheet): nombre, área, presentación, unidad, unidades por presentación,
   mín, máx, consumo promedio manual, código, nº tarjeta.
@@ -550,8 +549,6 @@ fondo tintado al 15 %, no texto amarillo).
 - Lista de productos con estado `out` o `reorder` primero, luego `unknown`.
 - Columnas: producto, saldo útil, pérdida proyectada, mín, máx, cobertura efectiva, **sugerido**
   (unidades y presentaciones).
-- Botón "Exportar pedido (CSV)" con las filas seleccionadas (casillas) y cantidades editables
-  antes de exportar.
 
 **Ajustes (`/ajustes`)**
 - Nombre del laboratorio, días crítico/advertencia, meses mín/máx por defecto.
@@ -637,8 +634,7 @@ claro/oscuro, ancho 375 px y 1280 px, y navegación solo con teclado.
   debounce, carga inicial con seed) + tests de acciones con `memoryRepository`.
 - [ ] **T2.4** `state/selectors.ts` + tests.
 - [ ] **T2.5** `lib/format.ts` (números `es-SV`, moneda USD, fechas cortas, "≈ 5 cajas + 4
-  pruebas", pluralización) y `lib/csv.ts` (BOM UTF-8 para que Excel abra acentos; separador `,`;
-  escapar comillas) + tests.
+  pruebas", pluralización) + tests. (`lib/csv.ts` queda fuera del MVP.)
 
 ### Fase 3 — Kit de UI (estilo Apple)
 Cargar la skill `apple-design` antes de empezar. Cada componente: utilidades Tailwind (sin CSS Modules), props tipadas,
@@ -667,7 +663,7 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 - [ ] **T4.3** Detalle de producto: encabezado, métricas, tabla de lotes FEFO con proyección,
   kardex.
 - [ ] **T4.4** Vencimientos (`/vencimientos`).
-- [ ] **T4.5** Compras (`/compras`) con selección y cantidades editables.
+- [ ] **T4.5** Compras (`/compras`) (sin selección ni cantidades editables: solo servían para exportar).
 - [ ] **T4.6** Resumen (`/`).
 
 ### Fase 5 — Pantallas de escritura
@@ -679,8 +675,8 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
   (desde detalle de lote, motivo obligatorio).
 - [ ] **T5.4** Editar producto (sheet) — mín/máx/consumo/unidades por presentación.
 
-### Fase 6 — Exportar, respaldo, ajustes
-- [ ] **T6.1** Exportar CSV: lista de productos, kardex de un producto, pedido de compra.
+### Fase 6 — Imprimir, respaldo, ajustes
+- [~] **T6.1** ~~Exportar CSV: lista de productos, kardex de un producto, pedido de compra.~~ Diferida (ver §12).
 - [ ] **T6.2** Imprimir kardex con `@media print` estilo tarjeta MINSAL.
 - [ ] **T6.3** Ajustes (§8.4) incluyendo fecha simulada, respaldo/restauración JSON y reset demo.
 
@@ -710,6 +706,9 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 
 ## 12. Después del MVP (no implementar todavía)
 
+- **Exportar a CSV** (diferida por decisión del usuario): lista de productos, kardex de un producto y
+  pedido de compra con filas seleccionables y cantidades editables; `lib/csv.ts` (BOM UTF-8 para
+  que Excel abra acentos; separador `,`; escapar comillas) y botones "Exportar" en kardex y Compras.
 - **Base de datos + API**: Postgres (Supabase o servidor propio) implementando
   `InventoryRepository`; tablas `products`, `lots`, `movements`, `areas`, `funding_sources`,
   `settings`; los saldos como vista SQL (`SUM` por lote). Sincronización offline-first.
@@ -734,4 +733,5 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 | 2026-11-13 | `todayISO(now: Date)` recibe el reloj como parámetro (el plan lo listaba sin argumentos); solo `state/today.ts` lee el reloj real. `daysUntil(date, today)` = días desde `today` hasta `date` (positivo si es futuro), como en §6.4/§6.5. `monthsBetween(a, b)` = meses calendario completos de a a b (negativo si b < a) | Mantener `domain/` puro; unificar el orden de argumentos de §6.4 y §6.6 |
 | 2026-11-13 | `productStock().lots` incluye todos los lotes del producto (también con saldo 0) en orden FEFO; el comparador `compareFefo` vive en `stock.ts` y `fefo.ts` lo reutilizará | Un solo orden FEFO para saldos, asignación y vistas |
 | 2026-11-13 | `allocateFefo` lanza `RangeError` si la cantidad no es positiva y finita (la validación de formularios la rechaza antes); ignora lotes con saldo ≤ 0. Se agrega `firstFefoLot(lots, today)` para que la UI detecte un override (lote elegido ≠ primero FEFO) | La cantidad inválida es un bug del llamador, no un resultado de negocio; el override de §6.3 necesita saber cuál es el lote FEFO |
+| 2026-11-13 | La exportación a CSV (T6.1, `lib/csv.ts`, botones de exportar y selección/cantidades editables en Compras) sale del MVP. Se mantienen respaldo/restauración JSON e imprimir kardex | Decisión del usuario; el respaldo JSON protege los datos locales |
 | 2026-11-13 | Tarjeta de Urea renumerada a LRC-07-24 en el seed | El original duplica LRC-06-24 |
