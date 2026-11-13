@@ -1,5 +1,24 @@
+# Dependencies and build output
 node_modules
 dist
 coverage
+*.tsbuildinfo
+
+# Secrets and local configuration (never commit; use .env.example for templates)
+.env
+.env.*
+!.env.example
 *.local
+.claude/settings.local.json
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Editors and OS
+.idea
+.vscode/*
+!.vscode/extensions.json
 .DS_Store
+Thumbs.db

@@ -39,6 +39,10 @@ function contentSecurityPolicy(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), contentSecurityPolicy()],
+  server: {
+    // Allow dev-server access through tunnels (e.g. trycloudflare.com)
+    allowedHosts: true,
+  },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
