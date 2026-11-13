@@ -1,0 +1,118 @@
+@layer theme, base, components, utilities;
+
+/*
+ * Native <dialog> presented as a sheet. The <dialog> itself is a transparent full-viewport box so
+ * a click on it is always a click on the backdrop; `.sheet-panel` is the visible surface.
+ * < 600 px: bottom sheet sliding up. >= 600 px: centered modal that fades and scales in.
+ * Exit animation relies on `transition-behavior: allow-discrete`; browsers without it close instantly.
+ */
+@layer components {
+  .sheet {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-label);
+    overflow: visible;
+    transition:
+      display var(--duration-base) allow-discrete,
+      overlay var(--duration-base) allow-discrete;
+  }
+
+  .sheet[open] {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .sheet::backdrop {
+    /* No scrim token yet: falls back to black at 40 % in both appearances. */
+    background: var(--color-scrim, color-mix(in srgb, black 40%, transparent));
+    opacity: 0;
+    transition:
+      opacity var(--duration-base) var(--ease),
+      display var(--duration-base) allow-discrete,
+      overlay var(--duration-base) allow-discrete;
+  }
+
+  .sheet[open]::backdrop {
+    opacity: 1;
+  }
+
+  .sheet-panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-height: 92dvh;
+    background: var(--color-bg-elevated);
+    border-top-left-radius: var(--radius-lg);
+    border-top-right-radius: var(--radius-lg);
+    padding-bottom: env(safe-area-inset-bottom);
+    transform: translateY(100%);
+    transition: transform var(--duration-base) var(--ease);
+  }
+
+  .sheet[open] .sheet-panel {
+    transform: none;
+  }
+
+  @media (min-width: 600px) {
+    .sheet[open] {
+      align-items: center;
+    }
+
+    .sheet-panel {
+      width: min(36rem, calc(100% - 2 * var(--space-6)));
+      max-height: min(48rem, calc(100dvh - 2 * var(--space-6)));
+      border-radius: var(--radius-lg);
+      padding-bottom: 0;
+      opacity: 0;
+      transform: scale(0.96);
+      transition:
+        transform var(--duration-base) var(--ease),
+        opacity var(--duration-base) var(--ease);
+    }
+
+    .sheet[open] .sheet-panel {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @starting-style {
+    .sheet[open]::backdrop {
+      opacity: 0;
+    }
+
+    .sheet[open] .sheet-panel {
+      transform: translateY(100%);
+    }
+
+    @media (min-width: 600px) {
+      .sheet[open] .sheet-panel {
+        opacity: 0;
+        transform: scale(0.96);
+      }
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sheet,
+    .sheet::backdrop,
+    .sheet-panel {
+      transition-duration: 0.01ms !important;
+    }
+
+    /* No travel: fade only. */
+    .sheet-panel,
+    .sheet[open] .sheet-panel {
+      transform: none;
+    }
+  }
+}

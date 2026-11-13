@@ -1,0 +1,86 @@
+@layer theme, base, components, utilities;
+
+/*
+ * Confirmation alert on a native <dialog>: always a centered card (also on small screens).
+ * Same full-viewport transparent dialog trick as Sheet, so only the card is visible.
+ */
+@layer components {
+  .alert {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-label);
+    overflow: visible;
+    transition:
+      display var(--duration-fast) allow-discrete,
+      overlay var(--duration-fast) allow-discrete;
+  }
+
+  .alert[open] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .alert::backdrop {
+    /* No scrim token yet: falls back to black at 40 % in both appearances. */
+    background: var(--color-scrim, color-mix(in srgb, black 40%, transparent));
+    opacity: 0;
+    transition:
+      opacity var(--duration-fast) var(--ease),
+      display var(--duration-fast) allow-discrete,
+      overlay var(--duration-fast) allow-discrete;
+  }
+
+  .alert[open]::backdrop {
+    opacity: 1;
+  }
+
+  .alert-panel {
+    width: min(20rem, calc(100% - 2 * var(--space-8)));
+    background: var(--color-bg-elevated);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    opacity: 0;
+    transform: scale(0.96);
+    transition:
+      transform var(--duration-fast) var(--ease),
+      opacity var(--duration-fast) var(--ease);
+  }
+
+  .alert[open] .alert-panel {
+    opacity: 1;
+    transform: none;
+  }
+
+  @starting-style {
+    .alert[open]::backdrop {
+      opacity: 0;
+    }
+
+    .alert[open] .alert-panel {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .alert,
+    .alert::backdrop,
+    .alert-panel {
+      transition-duration: 0.01ms !important;
+    }
+
+    .alert-panel,
+    .alert[open] .alert-panel {
+      transform: none;
+    }
+  }
+}
