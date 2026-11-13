@@ -132,7 +132,7 @@ describe('Table', () => {
     await user.click(screen.getByRole('cell', { name: 'Urea' }));
     expect(onRowClick).toHaveBeenLastCalledWith(products[1]);
 
-    const firstRow = screen.getAllByRole('row')[1];
+    const firstRow = screen.getAllByRole('row')[1]!;
     expect(firstRow).toHaveAttribute('tabindex', '0');
     firstRow.focus();
     await user.keyboard('{Enter}');

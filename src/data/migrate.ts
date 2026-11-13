@@ -90,11 +90,20 @@ function nonEmptyText(record: RawRecord, key: string, where: string, max: number
   return value;
 }
 
+/** Dates repeat a lot (thousands of movements, few distinct days): remember the valid ones. */
+const validDates = new Set<string>();
+
+function isDate(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  if (validDates.has(value)) return true;
+  if (!isValidISODate(value)) return false;
+  validDates.add(value);
+  return true;
+}
+
 function requiredDate(record: RawRecord, key: string, where: string): string {
   const value = own(record, key);
-  if (typeof value !== 'string' || !isValidISODate(value)) {
-    fail(`${where}: "${key}" no es una fecha válida (AAAA-MM-DD).`);
-  }
+  if (!isDate(value)) fail(`${where}: "${key}" no es una fecha válida (AAAA-MM-DD).`);
   return value;
 }
 
@@ -273,10 +282,7 @@ function readSettings(raw: unknown): Settings {
       defaultMaxMonths,
     },
     {
-      todayOverride:
-        typeof todayOverride === 'string' && isValidISODate(todayOverride)
-          ? todayOverride
-          : undefined,
+      todayOverride: isDate(todayOverride) ? todayOverride : undefined,
     },
   );
 }

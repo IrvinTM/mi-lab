@@ -50,7 +50,8 @@ it('mide derivaciones y persistencia con datos ×10', () => {
     ),
     measure('lotBalances (todos los lotes)', () => lotBalances(data)),
     measure('JSON.stringify', () => JSON.stringify(data)),
-    measure('JSON.parse + migrate', () => migrate(JSON.parse(json))),
+    measure('JSON.parse', () => JSON.parse(json)),
+    measure('JSON.parse + migrate (validación completa)', () => migrate(JSON.parse(json))),
   ];
   process.stdout.write(`\n${lines.join('\n')}\n\n`);
 });

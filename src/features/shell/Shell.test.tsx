@@ -20,10 +20,23 @@ beforeAll(installDialogPolyfill);
 
 beforeEach(() => {
   window.localStorage.clear();
-  setStore({ status: 'ready', loadError: undefined, data: sampleData() });
+  setStore({ status: 'ready', loadError: undefined, saveError: undefined, data: sampleData() });
 });
 
 describe('Shell', () => {
+  it('warns when saving failed and links to the backup, until a save succeeds', async () => {
+    setStore({ saveError: 'No se pudo guardar: el almacenamiento del navegador está lleno.' });
+    renderApp('/productos');
+    await screen.findByRole('heading', { level: 1, name: 'Productos' });
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(/almacenamiento del navegador está lleno/);
+    expect(
+      within(alert).getByRole('link', { name: 'Descarga un respaldo en Ajustes' }),
+    ).toHaveAttribute('href', '/ajustes');
+    setStore({ saveError: undefined });
+    expect(screen.queryByText(/almacenamiento del navegador está lleno/)).not.toBeInTheDocument();
+  });
+
   it('draws the frame with the lab name and the sections', async () => {
     renderApp('/productos');
     expect(await screen.findByRole('heading', { level: 1, name: 'Productos' })).toBeInTheDocument();
