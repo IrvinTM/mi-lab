@@ -29,6 +29,11 @@ salidas FEFO (sale primero lo que vence primero) y sugerencias de compra.
   y da el día anterior en UTC−6). Usa `src/domain/dates.ts`.
 - Cantidades siempre en unidad base (pruebas/unidades); convierte a cajas solo para mostrar.
 - Nunca divisiones por cero visibles: sin consumo → `null` → la UI muestra "—" o un mensaje.
+- Todo dato que entra de fuera (respaldo, `localStorage`, futura API) pasa por `data/migrate.ts`;
+  si agregas un campo al modelo, valídalo ahí y agrega un caso a `migrate.test.ts`.
+- La regla de capas de PLAN §5 la hace cumplir ESLint: no la desactives; mueve el código a la capa
+  correcta. IDs con `newId()` de `state/id.ts`, nunca `crypto.randomUUID()` directo (falla sin HTTPS).
+- `Table` memoiza filas: pasa `columns` y `onRowClick` estables (constante, `useMemo`, `useCallback`).
 - Antes de terminar: `pnpm run check` y `pnpm run build` en verde. Para UI, revisa claro/oscuro,
   375 px y 1280 px y navegación con teclado.
 - Commits: `T<n.m>: <descripción breve en español>`.

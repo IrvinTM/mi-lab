@@ -73,7 +73,7 @@ importación directa de Excel, notificaciones por correo.
 | Estilos | **Tailwind CSS v4** (`tailwindcss` + `@tailwindcss/vite`, dev) con los tokens de `src/styles/tokens.css` en `@theme static` | Decisión del usuario (reemplaza CSS Modules). Una sola fuente de verdad; paleta/escalas por defecto desactivadas |
 | Íconos | **lucide-react** | Trazos finos similares a SF Symbols; tree-shakeable |
 | Fechas | Utilidades propias en `src/domain/dates.ts` sobre strings `YYYY-MM-DD` | Evitar errores de zona horaria (ver §6.6) |
-| IDs | `crypto.randomUUID()` | Nativo |
+| IDs | `crypto.randomUUID()`, con UUID v4 sobre `crypto.getRandomValues()` si no existe (`state/id.ts`) | Nativo; `randomUUID` solo existe en HTTPS/localhost |
 | Tests | **Vitest** + **@testing-library/react** + jsdom | Lógica de dominio 100 % probada |
 | Lint/format | ESLint (config de Vite) + Prettier | |
 | Persistencia MVP | `localStorage` detrás de la interfaz `InventoryRepository` | Cambiar a API/DB sin tocar UI |
@@ -113,11 +113,13 @@ src/
     consumption.ts         # consumo promedio calculado desde movimientos
     ledger.ts              # filas del kardex con saldo acumulado
     validation.ts          # validación de formularios de entrada/salida
+    text.ts                # normalizeText: comparar sin mayúsculas ni acentos
     *.test.ts              # un test por archivo
   data/
     repository.ts          # interface InventoryRepository
     localStorageRepository.ts
     memoryRepository.ts    # para tests
+    migrate.ts             # versión + validación/saneo de todo dato externo (respaldo, storage)
     seed/
       buildSeed.ts         # construye catálogo + lotes demo desde docs/seed/inventario-octubre.json
       seed.test.ts
@@ -125,6 +127,9 @@ src/
     store.ts               # Zustand: datos + acciones (receive, issue, adjust, writeOff, …)
     selectors.ts           # derivaciones memoizadas para la UI
     today.ts               # fuente única de "hoy" (sobrescribible en ajustes para demos)
+    derive.ts              # derivaciones puras memoizadas por (data, today)
+    backup.ts              # tamaño máximo y validación de un archivo de respaldo
+    id.ts                  # newId(): UUID v4 también fuera de HTTPS
   ui/                      # KIT DE COMPONENTES (estilo Apple), sin lógica de negocio
     Button/ Badge/ Card/ List/ Table/ Sheet/ SegmentedControl/ SearchField/
     TextField/ Select/ DateField/ NumberField/ EmptyState/ Toast/ Stat/ Sidebar/
@@ -146,7 +151,9 @@ src/
 ```
 
 Regla de dependencias: `features → ui, state, domain, lib` · `state → data, domain` ·
-`data → domain` · `domain → (nada)`. `ui` nunca importa `state` ni `domain`.
+`data → domain` · `lib → domain` · `domain → (nada)`. `ui` nunca importa `state` ni `domain`.
+`eslint.config.js` la hace cumplir (`no-restricted-imports` por carpeta; los tests pueden importar
+cualquier capa) y prohíbe `new Date`/`Date.now()`/`localStorage` en `domain/` salvo `dates.ts`.
 
 ## 6. Modelo de dominio y algoritmos
 
@@ -589,7 +596,7 @@ writeOffExpired(lotId): void
 undo(movementIds: string[]): void       // borra esos movimientos y lotes que queden huérfanos
 upsertProduct(p: Product): void
 updateSettings(patch: Partial<Settings>): void
-resetToSeed(): void
+resetToSeed(): Promise<void>            // el seed es un chunk aparte (import())
 importBackup(json: unknown): { ok: boolean; error?: string }
 ```
 
@@ -689,8 +696,8 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
   registrar hallazgos en `docs/REVIEW.md` y corregir los de severidad alta.
 - [x] **T7.2** Accesibilidad: navegación completa por teclado, lector de pantalla en formularios,
   contraste de todos los badges en claro/oscuro, `lang="es"` en `<html>`.
-- [ ] **T7.3** Rendimiento: `npm run build` < 250 kB gzip JS; rutas con `React.lazy`; tablas de
-  > 200 filas sin lag (memoizar filas).
+- [x] **T7.3** Rendimiento: `npm run build` < 250 kB gzip JS; rutas con `React.lazy`; tablas de
+  > 200 filas sin lag (memoizar filas). Incluye auditoría de seguridad y calidad: `docs/AUDIT.md`.
 - [x] **T7.4** Guion de demo en `docs/DEMO.md`: 5 minutos mostrando (1) Resumen con lotes por
   vencer, (2) salida FEFO que toma el lote correcto, (3) intento de override con advertencia,
   (4) entrada de lote nuevo, (5) lista de compras exportada.
@@ -767,3 +774,7 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 | 2026-11-13 | **Contraste (T7.1)**: los tokens de color se separan por rol. `--color-accent` es solo para texto, íconos y anillo de foco (`#0055ba` claro / `#4da3ff` oscuro); `--color-accent-fill(-hover/-active)` (`#0071e3`/`#0066cc`/`#0058b0`) es el fondo de botones `filled` bajo `--color-on-accent` (blanco, 4.70:1). Igual para rojo: `--color-danger` (texto y error: `#c80014` / `#ff6961`) y `--color-danger-fill(-hover/-active)` (`#d70015`…). `tinted` usa el acento al 12/16/20 %. `--color-label-secondary` claro sube a 0.78 de opacidad; `--color-label-tertiary` queda solo para glifos decorativos. Nuevos: `--color-control-border` (borde de campos, ≥ 3:1), `--color-segment-selected`, `--color-scrim` (40 % / 60 %) y `--tabbar-height`. Los tonos de estado (`red`, `orange`…) solo tiñen badges e íconos. `src/styles/contrast.test.ts` calcula el contraste WCAG de 170 pares desde `tokens.css` (texto ≥ 4.5:1, bordes y foco ≥ 3:1, claro y oscuro); Vitest procesa `tokens.css` (`test.css.include`) para que `?raw` no llegue vacío | `accessibility.md › Vision`: 4.5:1 en texto ≤ 17 pt, en ambas apariencias; conservar el azul y rojo de sistema en los rellenos |
 | 2026-11-13 | **Accesibilidad (T7.1/T7.2)**: `PageHeader` fija `document.title` ("<página> · Mi-lab", `useDocumentTitle`); `RouteAnnouncer` anuncia la página tras navegar y lleva el foco a `<main>` si la página anterior se desmontó bajo él (cerrar `/entrada` o `/salida` vuelve a `<main>`, no al botón: pendiente, requiere rutas modales); ruta `*` → `NotFoundPage`. `Table` es una región con nombre y `tabIndex=0` solo mientras desborda en horizontal. Los errores de guardado de Entrada/Salida se muestran en el formulario (`FormError`, `role="alert"`), no en un toast que quedaría bajo la sheet; un envío inválido enfoca el primer campo con `aria-invalid` (`useFocusFirstInvalid`). ⌘Z/Ctrl+Z ejecuta el "Deshacer" del toast más reciente (no en campos de texto ni con diálogo abierto). Pruebas de punta a punta en `features/shell/a11y.test.tsx` | Revisión con la skill `apple-design`; detalle y pendientes en `docs/REVIEW.md` |
 | 2026-11-13 | **Kit (T7.1)**: `Button` agrega la variante `destructive-plain` (texto rojo) para acciones destructivas repetidas por fila ("Dar de baja") y en alertas; `IconButton` (44 px, `aria-label` obligatorio) para Cerrar de `Sheet` y `Toast`; `Alert` y `Toast` usan `Button`. En la alerta, Cancelar (izquierda) y la acción (derecha) tienen el mismo peso; la destructiva sigue enfocando Cancelar. `Stat` usa `title1` en teléfono y `large-title` desde 600 px, con `size="compact"` (`title2`) para valores que son frases; `PageHeader` igual. Botones con verbo: "Guardar cambios", "Guardar ajustes", "Renombrar"; "N.º" en vez de "Nº" | `alerts.md › Buttons`, `buttons.md › Style`, `writing.md` |
+| 2026-11-13 | **Rendimiento (T7.3)**: el seed (`buildSeed` + JSON) se carga con `import()` solo la primera vez o al restablecer (`resetToSeed()` es `async`); `Table` memoiza cada fila (`TableRow`), así que columnas y `onRowClick` deben ser estables (constante de módulo, `useMemo`, `useCallback`). Sin paginación ni ventaneo: Productos monta 1,000 filas y filtra en ≈ 1 s en jsdom; reconsiderar sobre ≈ 5,000. `src/test/largeData.ts` genera datos ×10 y `pnpm run perf` (`scripts/derive.perf.ts`, `PERF=1`, fuera de `check`) mide derivaciones y persistencia | Sin el seed el chunk inicial bajó 120.2 → 115.4 kB gzip (119.8 kB al final, con la validación y la robustez de T7.3); detalle en `docs/AUDIT.md` |
+| 2026-11-13 | **Validación de datos externos (T7.3)**: `migrate()` reconstruye cada registro campo a campo. Rechaza con `InvalidDataError` (mensaje en español con el n.º de registro) tipos erróneos, fechas inválidas, cantidades no finitas/≤ 0/> 10⁹ (ajuste ≠ 0), ids repetidos, referencias rotas (área, producto, lote; movimiento de otro producto), saldo final negativo de un lote y listas o textos sobre `LIMITS`; sanea claves extra (`__proto__` incluido), opcionales inválidos, máx. < mín. y ajustes incoherentes (vuelven a los valores por defecto). Igual para `localStorage`. Respaldo: ≤ 20 MB, validado antes de confirmar (`state/backup.ts`) | Un respaldo o almacenamiento alterado no debe romper pantallas ni dar `NaN`/saldos incoherentes |
+| 2026-11-13 | **Robustez (T7.3)**: un `saveError` se muestra como aviso en `Shell` con enlace a Ajustes; la pantalla de datos ilegibles ofrece "Descargar datos guardados" (`InventoryRepository.readRaw?()`, opcional) antes de restablecer; `useToday` sigue la medianoche y revisa la fecha al volver a la pestaña (`subscribeToDayChange`) | Antes un almacenamiento lleno era invisible y el día quedaba fijo hasta recargar |
+| 2026-11-13 | **Seguridad (T7.3)**: CSP en `<meta>` solo en el build (plugin `mi-lab:csp` de `vite.config.ts`, sin `'unsafe-inline'`); no se commitea `server.allowedHosts: true` (desactiva la protección contra DNS rebinding del servidor de desarrollo): ver `docs/AUDIT.md` S7. `noUncheckedIndexedAccess` activado; `exactOptionalPropertyTypes` queda pendiente (34 errores) | Ver `docs/AUDIT.md` |

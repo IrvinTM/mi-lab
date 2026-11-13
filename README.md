@@ -19,11 +19,13 @@ pnpm dev            # servidor de desarrollo
 pnpm run check      # typecheck + lint + tests
 pnpm run build      # build de producción
 pnpm test           # solo tests
+pnpm run perf       # tiempos de las derivaciones con datos ×10 (lento; no forma parte de check)
 ```
 
 ## Documentación
 
 - [`docs/PLAN.md`](docs/PLAN.md): plan, tareas y decisiones del MVP.
+- [`docs/AUDIT.md`](docs/AUDIT.md): auditoría de rendimiento, seguridad y calidad (T7.3).
 - [`CLAUDE.md`](CLAUDE.md): reglas para agentes.
 
 Created in [T3 Code](https://t3.codes).
