@@ -626,7 +626,7 @@ claro/oscuro, ancho 375 px y 1280 px, y navegación solo con teclado.
 - [x] **T1.9** `validation.ts` + tests (§6.10).
 
 ### Fase 2 — Datos
-- [ ] **T2.1** `repository.ts`, `memoryRepository.ts`, `localStorageRepository.ts` + tests.
+- [x] **T2.1** `repository.ts`, `memoryRepository.ts`, `localStorageRepository.ts` + tests.
 - [ ] **T2.2** `seed/buildSeed.ts` + tests (§7). Importar el JSON con
   `import seed from '../../../docs/seed/inventario-octubre.json'` (habilitar
   `resolveJsonModule`).
@@ -739,4 +739,5 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 | 2026-11-13 | Compras (§6.8): `evaluateReorder({ product, usableBalance, projectedWaste, avgMonthlyConsumption, settings })` → `{ status, min?, max?, stockForDecision, suggestedQty?, suggestedPackages? }`. Orden de decisión: `out` → `reorder` → `excess` → `unknown` (sin mínimo) → `ok`; con mínimo y sin máximo el estado es `ok`. `suggestedQty` se calcula siempre que haya máximo (0 si hay exceso); sin `unitsPerPackage` se redondea a entero | §6.8 no fijaba la precedencia de estados ni el caso sin presentación |
 | 2026-11-13 | Kardex (§6.9): `buildLedger(data, productId, avgMonthlyConsumption, range?)` → `LedgerRow[]` con saldo acumulado del producto completo (todos los lotes). Ajuste positivo → columna Entrada, negativo y bajas → Salida (cantidad siempre positiva). El filtro de fechas `{ from, to }` solo recorta filas: el saldo parte del historial real | Un saldo correcto aunque la vista esté filtrada |
 | 2026-11-13 | Validación (§6.10): `validateReceipt(form, ctx)` y `validateIssue(form, ctx)` → `{ errors, warnings }` por nombre de campo, más `isValid`, `normalizeLotNumber` y `findExistingLot` (el store las reutiliza). Además de §6.10: la fecha de entrada/salida no puede ser futura; el vencimiento debe ser > fecha de entrada y no estar vencido hoy (error), ≤ `criticalDays` → advertencia; en salida con lote manual se valida que no esté vencido, tenga saldo y la cantidad ≤ su saldo; elegir un lote ≠ FEFO da advertencia y exige motivo. Los mensajes usan el singular/plural de la unidad base | §6.10 no cubría fechas futuras ni la salida con lote manual |
+| 2026-11-13 | Repositorios (§9): `load()` devuelve `null` si no hay nada guardado y **rechaza con `RepositoryError`** si hay datos ilegibles (JSON corrupto o versión no soportada), para que el store no los pise con el seed al guardar; `save()` convierte un `QuotaExceededError` en `RepositoryError`. `migrate(raw)` vive en `data/migrate.ts` junto con `DEFAULT_SETTINGS` (los ajustes ausentes se completan con los valores por defecto); `src/test/fixtures.ts` aporta `sampleData()` para tests | Evitar perder datos del usuario ante un fallo de lectura; `migrate` y los ajustes por defecto los comparten repositorio, importación de respaldo y seed |
 | 2026-11-13 | Tarjeta de Urea renumerada a LRC-07-24 en el seed | El original duplica LRC-06-24 |
