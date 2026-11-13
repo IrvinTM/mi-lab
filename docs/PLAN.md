@@ -618,7 +618,7 @@ claro/oscuro, ancho 375 px y 1280 px, y navegación solo con teclado.
 - [x] **T1.1** `types.ts` + `dates.ts` + tests (incluye caso de zona horaria: `daysUntil` entre
   `2026-11-13` y `2026-11-14` = 1; `addDays('2026-02-28', 1)` = `2026-03-01`).
 - [x] **T1.2** `stock.ts` + tests (§6.2).
-- [ ] **T1.3** `fefo.ts` + tests (§6.3, todos los casos listados).
+- [x] **T1.3** `fefo.ts` + tests (§6.3, todos los casos listados).
 - [ ] **T1.4** `expiry.ts` + tests (§6.4, bordes 0, 30, 31, 90, 91 días, −1).
 - [ ] **T1.5** `consumption.ts` + tests (§6.7).
 - [ ] **T1.6** `projection.ts` + tests (§6.5). Casos: consumo alto → sin pérdida; lote lejano
@@ -733,4 +733,5 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 | 2026-11-13 | Tailwind v4 reemplaza CSS Modules; `tokens.css` pasa a `@theme static` y se desactivan `--color-*`, `--text-*`, `--radius-*`, `--font-*` por defecto | Decisión del usuario; los tokens siguen siendo la única fuente de verdad (claro/oscuro por variables) |
 | 2026-11-13 | `todayISO(now: Date)` recibe el reloj como parámetro (el plan lo listaba sin argumentos); solo `state/today.ts` lee el reloj real. `daysUntil(date, today)` = días desde `today` hasta `date` (positivo si es futuro), como en §6.4/§6.5. `monthsBetween(a, b)` = meses calendario completos de a a b (negativo si b < a) | Mantener `domain/` puro; unificar el orden de argumentos de §6.4 y §6.6 |
 | 2026-11-13 | `productStock().lots` incluye todos los lotes del producto (también con saldo 0) en orden FEFO; el comparador `compareFefo` vive en `stock.ts` y `fefo.ts` lo reutilizará | Un solo orden FEFO para saldos, asignación y vistas |
+| 2026-11-13 | `allocateFefo` lanza `RangeError` si la cantidad no es positiva y finita (la validación de formularios la rechaza antes); ignora lotes con saldo ≤ 0. Se agrega `firstFefoLot(lots, today)` para que la UI detecte un override (lote elegido ≠ primero FEFO) | La cantidad inválida es un bug del llamador, no un resultado de negocio; el override de §6.3 necesita saber cuál es el lote FEFO |
 | 2026-11-13 | Tarjeta de Urea renumerada a LRC-07-24 en el seed | El original duplica LRC-06-24 |
