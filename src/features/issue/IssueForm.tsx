@@ -9,6 +9,8 @@ import { formatExpiry, formatQuantity } from '@/lib/format';
 import { useToday } from '@/state/selectors';
 import { useInventoryStore } from '@/state/store';
 import { Button, DateField, NumberField, Select, TextField, useToast } from '@/ui';
+import { FormError } from '../shared/FormError';
+import { useFocusFirstInvalid } from '../shared/forms';
 import { ProductPicker } from '../shared/ProductPicker';
 
 interface IssueFormProps {
@@ -43,6 +45,8 @@ export function IssueForm({
   const [lotId, setLotId] = useState(initialLotId);
   const [reason, setReason] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [formError, setFormError] = useState<string>();
+  const { ref: formRef, focusFirstInvalid } = useFocusFirstInvalid();
 
   const product = data.products.find((p) => p.id === productId);
   const perPackage = product?.unitsPerPackage;
@@ -106,7 +110,11 @@ export function IssueForm({
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     setSubmitted(true);
-    if (!isValid(check)) return;
+    setFormError(undefined);
+    if (!isValid(check)) {
+      focusFirstInvalid();
+      return;
+    }
 
     const result = useInventoryStore.getState().issue({
       productId,
@@ -116,7 +124,7 @@ export function IssueForm({
       ...(manual ? { lotId: effectiveLotId, fefoOverrideReason: reason } : {}),
     });
     if (!result.ok) {
-      toast.show({ message: result.error });
+      setFormError(result.error); // a toast would sit behind the modal sheet
       return;
     }
     onDone();
@@ -126,14 +134,14 @@ export function IssueForm({
         label: 'Deshacer',
         onAction: () => {
           const undone = useInventoryStore.getState().undo(result.movementIds);
-          toast.show({ message: undone ? 'Salida deshecha.' : 'No se pudo deshacer la salida.' });
+          toast.show({ message: undone ? 'Salida deshecha' : 'No se pudo deshacer la salida.' });
         },
       },
     });
   };
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-4 p-4">
+    <form ref={formRef} onSubmit={submit} noValidate className="flex flex-col gap-4">
       <ProductPicker
         products={data.products.filter((p) => !p.archived)}
         areaNames={new Map(data.areas.map((area) => [area.id, area.name]))}
@@ -257,6 +265,7 @@ export function IssueForm({
         )
       ) : null}
 
+      <FormError message={formError} />
       <div className="flex flex-wrap justify-end gap-2 pt-2">
         <Button type="button" variant="plain" onClick={onCancel}>
           Cancelar

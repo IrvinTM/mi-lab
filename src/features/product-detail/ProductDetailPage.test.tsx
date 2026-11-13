@@ -313,7 +313,7 @@ describe('inventory actions on the detail page', () => {
       await user.clear(min);
       await user.type(min, '80');
       await user.clear(within(dialog).getByLabelText('Consumo promedio mensual (manual)'));
-      await user.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+      await user.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
 
       const product = state().products.find((p) => p.id === 'p1')!;
       expect(product.minStock).toBe(80);
@@ -331,7 +331,7 @@ describe('inventory actions on the detail page', () => {
       const max = within(dialog).getByLabelText('Existencia máxima');
       await user.clear(max);
       await user.type(max, '10');
-      await user.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+      await user.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
       expect(within(dialog).getByText('Ingresa el nombre del producto.')).toBeInTheDocument();
       expect(
         within(dialog).getByText('El máximo no puede ser menor que el mínimo.'),

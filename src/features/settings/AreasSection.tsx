@@ -23,7 +23,7 @@ function RenameForm({ area, onClose }: { area: Area; onClose: () => void }) {
   };
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-4 p-4">
+    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
       <TextField
         label="Nombre del área"
         value={name}
@@ -38,7 +38,7 @@ function RenameForm({ area, onClose }: { area: Area; onClose: () => void }) {
         <Button type="button" variant="plain" onClick={onClose}>
           Cancelar
         </Button>
-        <Button type="submit">Guardar</Button>
+        <Button type="submit">Renombrar</Button>
       </div>
     </form>
   );

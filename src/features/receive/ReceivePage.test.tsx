@@ -53,7 +53,7 @@ describe('ReceivePage', () => {
   it('records a receipt, shows the toast and closes the sheet', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.type(screen.getByLabelText('Nº de lote'), 'lt555001');
+    await user.type(screen.getByLabelText('N.º de lote'), 'lt555001');
     setDate('Vencimiento', '2027-09-01');
     await user.type(screen.getByLabelText('Cantidad'), '48');
     await user.type(screen.getByLabelText(/Precio unitario/), '2,5');
@@ -78,7 +78,7 @@ describe('ReceivePage', () => {
   it('"Deshacer" removes the receipt and the lot it created', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.type(screen.getByLabelText('Nº de lote'), 'LT555002');
+    await user.type(screen.getByLabelText('N.º de lote'), 'LT555002');
     setDate('Vencimiento', '2027-09-01');
     await user.type(screen.getByLabelText('Cantidad'), '10');
     await user.click(screen.getByRole('button', { name: 'Registrar entrada' }));
@@ -86,7 +86,7 @@ describe('ReceivePage', () => {
 
     const { data } = useInventoryStore.getState();
     expect(data.lots.some((l) => l.lotNumber === 'LT555002')).toBe(false);
-    expect(await screen.findByText('Entrada deshecha.')).toBeInTheDocument();
+    expect(await screen.findByText('Entrada deshecha')).toBeInTheDocument();
   });
 
   it('shows what is missing when submitting an empty form, and saves nothing', async () => {
@@ -100,14 +100,14 @@ describe('ReceivePage', () => {
     expect(
       screen.getByText('La cantidad debe ser un número entero mayor que 0.'),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('Nº de lote')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('N.º de lote')).toHaveAttribute('aria-invalid', 'true');
     expect(receipts()).toHaveLength(before);
   });
 
   it('rejects the same lot number with a different expiry date', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.type(screen.getByLabelText('Nº de lote'), 'lt123456');
+    await user.type(screen.getByLabelText('N.º de lote'), 'lt123456');
     setDate('Vencimiento', '2027-07-01');
     await user.type(screen.getByLabelText('Cantidad'), '5');
     await user.click(screen.getByRole('button', { name: 'Registrar entrada' }));
@@ -119,7 +119,7 @@ describe('ReceivePage', () => {
   it('adds to an existing lot when the expiry matches', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.type(screen.getByLabelText('Nº de lote'), 'lt123456');
+    await user.type(screen.getByLabelText('N.º de lote'), 'lt123456');
     setDate('Vencimiento', '2027-06-30');
     await user.type(screen.getByLabelText('Cantidad'), '12');
     await user.click(screen.getByRole('button', { name: 'Registrar entrada' }));
@@ -134,7 +134,7 @@ describe('ReceivePage', () => {
     await user.selectOptions(screen.getByLabelText('Unidad de la cantidad'), 'package');
     await user.type(screen.getByLabelText('Cantidad'), '2');
     expect(screen.getByText('= 48 pruebas')).toBeInTheDocument();
-    await user.type(screen.getByLabelText('Nº de lote'), 'LT555003');
+    await user.type(screen.getByLabelText('N.º de lote'), 'LT555003');
     setDate('Vencimiento', '2027-09-01');
     await user.click(screen.getByRole('button', { name: 'Registrar entrada' }));
     expect(receipts().at(-1)?.quantity).toBe(48);
@@ -143,7 +143,7 @@ describe('ReceivePage', () => {
   it('needs a second, explicit click when the lot expires soon', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.type(screen.getByLabelText('Nº de lote'), 'LT555004');
+    await user.type(screen.getByLabelText('N.º de lote'), 'LT555004');
     setDate('Vencimiento', '2026-12-01');
     await user.type(screen.getByLabelText('Cantidad'), '5');
     const before = receipts().length;
@@ -159,7 +159,7 @@ describe('ReceivePage', () => {
   it('notes that the new lot will be used first when it expires before the stock', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.type(screen.getByLabelText('Nº de lote'), 'LT555005');
+    await user.type(screen.getByLabelText('N.º de lote'), 'LT555005');
     setDate('Vencimiento', '2027-03-01'); // existing lot expires 2027-06-30
     expect(
       screen.getByText('Este lote vence antes que los que ya tienes; se usará primero.'),
@@ -173,7 +173,7 @@ describe('ReceivePage', () => {
     renderPage('/entrada');
     const field = screen.getByLabelText('Producto');
     await user.type(field, 'GLUCOSA');
-    await user.type(screen.getByLabelText('Nº de lote'), 'LT555006');
+    await user.type(screen.getByLabelText('N.º de lote'), 'LT555006');
     setDate('Vencimiento', '2027-09-01');
     await user.type(screen.getByLabelText('Cantidad'), '1');
     await user.click(screen.getByRole('button', { name: 'Registrar entrada' }));
@@ -183,7 +183,7 @@ describe('ReceivePage', () => {
   it('does not accept a quantity of 0 or a negative price', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.type(screen.getByLabelText('Nº de lote'), 'LT555007');
+    await user.type(screen.getByLabelText('N.º de lote'), 'LT555007');
     setDate('Vencimiento', '2027-09-01');
     await user.type(screen.getByLabelText('Cantidad'), '0');
     await user.type(screen.getByLabelText(/Precio unitario/), 'abc');

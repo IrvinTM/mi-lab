@@ -57,6 +57,12 @@ export const appRoutes: RouteObject[] = [
           Component: (await import('@/features/settings/SettingsPage')).SettingsPage,
         }),
       },
+      {
+        path: '*',
+        lazy: async () => ({
+          Component: (await import('@/features/shell/NotFoundPage')).NotFoundPage,
+        }),
+      },
     ],
   },
 ];

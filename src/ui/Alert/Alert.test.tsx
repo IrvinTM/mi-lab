@@ -44,14 +44,14 @@ describe('Alert', () => {
 
   it('paints the destructive action red', () => {
     setup({ destructive: true });
-    expect(screen.getByRole('button', { name: 'Dar de baja' })).toHaveClass('text-red');
+    expect(screen.getByRole('button', { name: 'Dar de baja' })).toHaveClass('text-danger');
   });
 
   it('focuses the confirm button in a non-destructive alert', () => {
     setup();
     const confirm = screen.getByRole('button', { name: 'Dar de baja' });
     expect(confirm).toHaveFocus();
-    expect(confirm).not.toHaveClass('text-red');
+    expect(confirm).not.toHaveClass('text-danger');
   });
 
   it('calls onConfirm / onCancel from the buttons', async () => {

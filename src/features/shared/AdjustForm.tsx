@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { formatQuantity } from '@/lib/format';
 import { useInventoryStore } from '@/state/store';
 import { Button, NumberField, Select, TextField, useToast } from '@/ui';
+import { useFocusFirstInvalid } from './forms';
 import type { AdjustTarget } from './useAdjust';
 
 type Direction = 'increase' | 'decrease';
@@ -12,6 +13,7 @@ export function AdjustForm({ target, onClose }: { target: AdjustTarget; onClose:
   const [quantity, setQuantity] = useState<number | null>(null);
   const [reason, setReason] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const { ref: formRef, focusFirstInvalid } = useFocusFirstInvalid();
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -19,6 +21,7 @@ export function AdjustForm({ target, onClose }: { target: AdjustTarget; onClose:
     const result = useInventoryStore.getState().adjust(target.lotId, delta, reason);
     if (!result.ok) {
       setErrors(result.errors);
+      focusFirstInvalid();
       return;
     }
     onClose();
@@ -28,14 +31,14 @@ export function AdjustForm({ target, onClose }: { target: AdjustTarget; onClose:
         label: 'Deshacer',
         onAction: () => {
           const undone = useInventoryStore.getState().undo(result.movementIds);
-          toast.show({ message: undone ? 'Ajuste deshecho.' : 'No se pudo deshacer el ajuste.' });
+          toast.show({ message: undone ? 'Ajuste deshecho' : 'No se pudo deshacer el ajuste.' });
         },
       },
     });
   };
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-4 p-4">
+    <form ref={formRef} onSubmit={submit} noValidate className="flex flex-col gap-4">
       <p className="text-callout text-label-secondary">
         {target.productName} · Lote {target.lotNumber} · Saldo actual:{' '}
         {formatQuantity(target.balance, target.unit)}

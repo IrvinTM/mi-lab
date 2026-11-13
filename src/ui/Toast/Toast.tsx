@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
+import { Button, IconButton } from '../Button';
 import { ToastContext, type ToastApi, type ToastOptions } from './toast-context';
 import './toast.css';
 
@@ -27,6 +28,31 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const api = useMemo<ToastApi>(() => ({ show, dismiss }), [show, dismiss]);
 
+  // ⌘Z / Ctrl+Z runs the newest visible "Deshacer", so undoing never depends on reaching the
+  // toast with Tab before it closes. Text fields keep their own undo.
+  const latestUndo = [...toasts].reverse().find((toast) => toast.action);
+  useEffect(() => {
+    if (!latestUndo?.action) return;
+    const { id, action } = latestUndo;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'z' || !(event.metaKey || event.ctrlKey)) return;
+      if (event.shiftKey || event.altKey || event.defaultPrevented) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+      ) {
+        return;
+      }
+      if (document.querySelector('dialog[open]')) return;
+      event.preventDefault();
+      action.onAction();
+      dismiss(id);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [latestUndo, dismiss]);
+
   return (
     <ToastContext value={api}>
       {children}
@@ -34,7 +60,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div
         aria-live="polite"
         aria-relevant="additions"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-center gap-2 p-4 pb-[calc(var(--space-4)+env(safe-area-inset-bottom))]"
+        // Below 900 px the toasts sit above the tab bar (and the home indicator), never under it.
+        className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--tabbar-height)+env(safe-area-inset-bottom))] z-50 flex flex-col items-center gap-2 p-4 desktop:bottom-0 desktop:pb-[calc(var(--space-4)+env(safe-area-inset-bottom))]"
       >
         {toasts.map((toast) => (
           <ToastItem key={toast.id} toast={toast} onDismiss={dismiss} />
@@ -63,7 +90,7 @@ function ToastItem({ toast, onDismiss }: { toast: ToastEntry; onDismiss: (id: nu
 
   return (
     <div
-      className="toast pointer-events-auto flex w-full max-w-md items-center gap-1 rounded-lg border border-separator bg-bg-elevated py-1 pr-1 pl-4 text-label"
+      className="toast pointer-events-auto flex w-full max-w-md items-center gap-1 rounded-lg border border-separator bg-bg-elevated py-1 pr-1 pl-4 text-label shadow-lg"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setFocused(true)}
@@ -77,25 +104,23 @@ function ToastItem({ toast, onDismiss }: { toast: ToastEntry; onDismiss: (id: nu
     >
       <p className="flex-1 py-2 text-subheadline">{message}</p>
       {action && (
-        <button
-          type="button"
+        <Button
+          variant="plain"
+          className="shrink-0"
           onClick={() => {
             action.onAction();
             onDismiss(id);
           }}
-          className="min-h-(--hit-target) shrink-0 rounded-md px-3 text-subheadline font-semibold text-accent hover:bg-fill"
         >
           {action.label}
-        </button>
+        </Button>
       )}
-      <button
-        type="button"
-        onClick={() => onDismiss(id)}
+      <IconButton
+        icon={X}
+        iconSize={18}
         aria-label="Cerrar notificación"
-        className="flex size-(--hit-target) shrink-0 items-center justify-center rounded-full text-label-secondary hover:bg-fill"
-      >
-        <X aria-hidden="true" size={18} />
-      </button>
+        onClick={() => onDismiss(id)}
+      />
     </div>
   );
 }

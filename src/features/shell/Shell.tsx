@@ -11,6 +11,7 @@ import { Link, Outlet } from 'react-router';
 import { formatDate } from '@/lib/format';
 import { useInventoryStore } from '@/state/store';
 import { AppShell, Alert, Badge, Button, EmptyState, ToastProvider, type NavItem } from '@/ui';
+import { RouteAnnouncer } from './RouteAnnouncer';
 import { useGlobalShortcuts } from './useGlobalShortcuts';
 
 const NAV_ITEMS: NavItem[] = [
@@ -80,7 +81,7 @@ export function Shell() {
   if (status === 'error') return <LoadError message={loadError} />;
 
   const notice = todayOverride ? (
-    <Link to="/ajustes" className="block px-3 py-2 desktop:px-0">
+    <Link to="/ajustes" className="block px-4 py-2 desktop:px-3 desktop:pt-0">
       <Badge tone="orange" icon={CalendarClock}>
         Fecha simulada: {formatDate(todayOverride)}
       </Badge>
@@ -92,6 +93,7 @@ export function Shell() {
       <AppShell title={labName} items={NAV_ITEMS} settings={SETTINGS_ITEM} notice={notice}>
         <Outlet />
       </AppShell>
+      <RouteAnnouncer />
     </ToastProvider>
   );
 }

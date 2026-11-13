@@ -1,4 +1,5 @@
 import { useId, useRef } from 'react';
+import { Button } from '../Button';
 import { useModalDialog } from '../internal/useModalDialog';
 import './alert.css';
 
@@ -9,15 +10,12 @@ export interface AlertProps {
   /** Verb that names the result ("Dar de baja"), never "OK". */
   confirmLabel: string;
   cancelLabel?: string;
-  /** Paints the confirm button red and puts the initial focus on Cancel. */
+  /** Red confirm label, and the initial focus (and the visual emphasis) goes to Cancel. */
   destructive?: boolean;
   onConfirm: () => void;
   /** Cancel button and Esc. The backdrop does not dismiss an alert. */
   onCancel: () => void;
 }
-
-const buttonClass =
-  'min-h-(--hit-target) px-4 text-body hover:bg-fill focus-visible:-outline-offset-3';
 
 /**
  * Confirmation alert (`role="alertdialog"`). For a destructive alert the initial focus lands on
@@ -63,23 +61,24 @@ export function Alert({
             </p>
           )}
         </div>
-        <div className="grid grid-cols-2 border-t border-separator">
-          <button
+        {/* Cancel leads and the action trails. A destructive action is never the prominent one. */}
+        <div className="grid grid-cols-2 gap-2 px-4 pb-4">
+          <Button
             ref={cancelRef}
-            type="button"
+            variant={destructive ? 'tinted' : 'plain'}
+            fullWidth
             onClick={onCancel}
-            className={`${buttonClass} border-r border-separator text-accent`}
           >
             {cancelLabel}
-          </button>
-          <button
+          </Button>
+          <Button
             ref={confirmRef}
-            type="button"
+            variant={destructive ? 'destructive-plain' : 'filled'}
+            fullWidth
             onClick={onConfirm}
-            className={`${buttonClass} ${destructive ? 'font-bold text-red' : 'font-semibold text-accent'}`}
           >
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </dialog>

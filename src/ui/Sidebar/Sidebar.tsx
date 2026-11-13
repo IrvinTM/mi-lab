@@ -17,7 +17,7 @@ interface SidebarProps {
   items: readonly NavItem[];
   /** Items pinned to the bottom, e.g. Settings. */
   footerItems?: readonly NavItem[];
-  /** Always-visible notice above the footer, e.g. "Fecha simulada". */
+  /** Always-visible notice under the title, e.g. "Fecha simulada". */
   notice?: ReactNode;
   className?: string;
 }
@@ -56,13 +56,13 @@ export function Sidebar({ title, items, footerItems = [], notice, className }: S
       className={`sticky top-0 h-screen w-60 shrink-0 flex-col gap-1 border-e border-separator bg-bg-secondary p-3 ${className ?? 'flex'}`.trim()}
     >
       <p className="truncate px-3 pb-3 pt-2 text-headline font-semibold text-label">{title}</p>
+      {notice}
       <nav aria-label="Secciones" className="flex flex-col gap-1">
         {items.map((item) => (
           <SidebarLink key={item.to} item={item} />
         ))}
       </nav>
       <div className="mt-auto flex flex-col gap-1">
-        {notice}
         {footerItems.length > 0 ? (
           <nav aria-label="Ajustes" className="flex flex-col gap-1">
             {footerItems.map((item) => (

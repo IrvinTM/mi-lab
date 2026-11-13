@@ -36,21 +36,25 @@ export function ProductMetrics({ row }: { row: ProductRow }) {
       className="grid grid-cols-1 gap-3 sheet:grid-cols-2 desktop:grid-cols-3"
     >
       <Stat
+        size="compact"
         label="Saldo útil"
         value={formatStock(row.usable, product)}
         detail={`No vencido · ${formatQuantity(row.usable, product.unit)}`}
       />
       <Stat
+        size="compact"
         label="Vencido"
         value={formatStock(row.expired, product)}
         detail={row.expired > 0 ? 'No se puede usar' : 'Sin lotes vencidos con saldo'}
       />
       <Stat
+        size="compact"
         label="Consumo promedio"
         value={consumption ? formatQuantity(consumption.value, product.unit) : EMPTY}
         detail={consumptionDetail(consumption)}
       />
       <Stat
+        size="compact"
         label="Cobertura efectiva"
         value={formatCoverage(row.effectiveCoverageMonths)}
         detail={
@@ -60,6 +64,7 @@ export function ProductMetrics({ row }: { row: ProductRow }) {
         }
       />
       <Stat
+        size="compact"
         label="Mínimo / máximo"
         value={
           hasLimits ? `${optionalNumber(reorder.min)} / ${optionalNumber(reorder.max)}` : EMPTY
@@ -69,6 +74,7 @@ export function ProductMetrics({ row }: { row: ProductRow }) {
         }
       />
       <Stat
+        size="compact"
         label="Compra sugerida"
         value={
           reorder.suggestedQty === undefined

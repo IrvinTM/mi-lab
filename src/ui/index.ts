@@ -1,9 +1,9 @@
 export { Alert } from './Alert';
 export type { AlertProps } from './Alert';
-export { AppShell, PageHeader } from './AppShell';
+export { AppShell, PageHeader, useDocumentTitle } from './AppShell';
 export { Badge } from './Badge';
 export type { BadgeTone } from './Badge';
-export { Button } from './Button';
+export { Button, IconButton } from './Button';
 export { Card } from './Card';
 export { DateField } from './DateField';
 export { EmptyState } from './EmptyState';

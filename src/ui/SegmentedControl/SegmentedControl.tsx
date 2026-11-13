@@ -83,7 +83,7 @@ export function SegmentedControl<T extends string>({
           aria-checked={option.value === value}
           tabIndex={index === tabbableIndex ? 0 : -1}
           onClick={() => select(index)}
-          className="flex min-h-10 min-w-0 flex-1 cursor-pointer items-center justify-center rounded-sm px-3 text-subheadline text-label transition-colors duration-150 aria-checked:bg-bg-elevated aria-checked:font-semibold aria-checked:shadow-sm"
+          className="flex min-h-10 min-w-0 flex-1 cursor-pointer items-center justify-center rounded-sm px-3 text-subheadline text-label transition-colors duration-150 aria-checked:bg-segment-selected aria-checked:font-semibold aria-checked:shadow-sm"
         >
           <span className="truncate">{option.label}</span>
         </button>

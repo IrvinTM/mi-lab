@@ -152,13 +152,13 @@ function Gallery() {
       <Section title="Campos">
         <SearchField label="Buscar producto" value={search} onChange={setSearch} />
         <TextField
-          label="Nº de lote"
+          label="N.º de lote"
           value={name}
           onChange={setName}
           help="Se guarda en mayúsculas."
         />
         <TextField
-          label="Nº de lote (error)"
+          label="N.º de lote (error)"
           value=""
           onChange={() => {}}
           error="Ingresa el número de lote."
@@ -275,7 +275,7 @@ function Gallery() {
         </div>
         <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Registrar entrada">
           <div className="flex flex-col gap-4 p-4">
-            <TextField label="Nº de lote" value={name} onChange={setName} />
+            <TextField label="N.º de lote" value={name} onChange={setName} />
             <Button onClick={() => setSheetOpen(false)}>Guardar</Button>
           </div>
         </Sheet>

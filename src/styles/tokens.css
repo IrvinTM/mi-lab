@@ -61,9 +61,31 @@
   --color-fill: rgba(120, 120, 128, 0.12);
   --color-separator: rgba(60, 60, 67, 0.18);
   --color-label: #000000;
-  --color-label-secondary: rgba(60, 60, 67, 0.6);
+  /* Secondary text is darker than Apple's 0.6 so footnotes reach 4.5:1 on every surface. */
+  --color-label-secondary: rgba(60, 60, 67, 0.78);
+  /* Decorative glyphs only (chevrons, empty-state icons): never text. */
   --color-label-tertiary: rgba(60, 60, 67, 0.3);
-  --color-accent: #007aff; /* systemBlue */
+  /* Border of form controls: 3:1 against the surface, unlike the hairline separator. */
+  --color-control-border: rgba(60, 60, 67, 0.6);
+  --color-segment-selected: #ffffff;
+  --color-scrim: rgba(0, 0, 0, 0.4);
+
+  /*
+   * Accent, split by role so every pairing reaches 4.5:1 (checked by contrast.test.ts):
+   * `accent` is for text, icons and the focus ring; `accent-fill` is the background of filled
+   * buttons, always under `on-accent` text. Same split for `danger` (destructive and error text).
+   */
+  --color-accent: #0055ba;
+  --color-accent-fill: #0071e3;
+  --color-accent-fill-hover: #0066cc;
+  --color-accent-fill-active: #0058b0;
+  --color-on-accent: #ffffff;
+  --color-danger: #d70015;
+  --color-danger-fill: #d70015;
+  --color-danger-fill-hover: #c00012;
+  --color-danger-fill-active: #a8000f;
+
+  /* Status hues: tints (15 %) and badge icons only, never text. */
   --color-red: #ff3b30;
   --color-orange: #ff9500;
   --color-yellow: #ffcc00;
@@ -75,6 +97,8 @@
 :root {
   color-scheme: light dark;
   --hit-target: 44px;
+  /* Height of the bottom tab bar (< 900 px); toasts sit above it. */
+  --tabbar-height: 3.5rem;
   --duration-fast: 150ms;
   --duration-base: 250ms;
   --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
@@ -91,7 +115,11 @@
     --color-label: #ffffff;
     --color-label-secondary: rgba(235, 235, 245, 0.6);
     --color-label-tertiary: rgba(235, 235, 245, 0.3);
-    --color-accent: #0a84ff;
+    --color-control-border: rgba(235, 235, 245, 0.4);
+    --color-segment-selected: #636366;
+    --color-scrim: rgba(0, 0, 0, 0.6);
+    --color-accent: #4da3ff;
+    --color-danger: #ff6961;
     --color-red: #ff453a;
     --color-orange: #ff9f0a;
     --color-yellow: #ffd60a;

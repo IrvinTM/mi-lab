@@ -32,7 +32,7 @@ describe('Button', () => {
     const filled = screen.getByRole('button').className;
     rerender(<Button variant="destructive">A</Button>);
     expect(screen.getByRole('button').className).not.toBe(filled);
-    expect(screen.getByRole('button')).toHaveClass('bg-red');
+    expect(screen.getByRole('button')).toHaveClass('bg-danger-fill', 'text-on-accent');
   });
 
   it('does not fire onClick while loading, keeps focus and reports busy', async () => {

@@ -5,7 +5,7 @@ import { formatCurrency, formatNumber, formatQuantity, formatStock, EMPTY } from
 import { filterExpiring, type ExpiringFilter, type ExpiringLot } from '@/state/derive';
 import { useExpiringLots } from '@/state/selectors';
 import { useInventoryStore } from '@/state/store';
-import { Button, EmptyState, List, PageHeader, SegmentedControl, Stat } from '@/ui';
+import { Button, Card, EmptyState, List, PageHeader, SegmentedControl } from '@/ui';
 import { PageActions } from '../shared/PageActions';
 import { useWriteOff, type WriteOffTarget } from '../shared/useWriteOff';
 import { ExpiryBadge } from '../shared/StatusBadges';
@@ -142,11 +142,23 @@ export function ExpiringPage() {
         </EmptyState>
       ) : (
         <>
-          <div className="mb-6 grid grid-cols-3 gap-3" role="group" aria-label="Totales">
-            <Stat label="Lotes" value={formatNumber(lots.length)} />
-            <Stat label="Unidades" value={formatNumber(totals.units)} />
-            <Stat label="Valor" value={formatCurrency(totals.value)} />
-          </div>
+          {/* One card, three figures: fits 375 px and announces the new totals on filter change. */}
+          <Card role="group" aria-label="Totales" aria-live="polite" className="mb-6">
+            <dl className="grid grid-cols-3 gap-3">
+              {[
+                ['Lotes', formatNumber(lots.length)],
+                ['Unidades', formatNumber(totals.units)],
+                ['Valor', formatCurrency(totals.value)],
+              ].map(([label, value]) => (
+                <div key={label} className="flex min-w-0 flex-col gap-0.5">
+                  <dt className="text-footnote text-label-secondary">{label}</dt>
+                  <dd className="m-0 text-headline font-semibold tabular-nums text-label sheet:text-title2">
+                    {value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </Card>
           <div className="flex flex-col gap-6">
             {groups.map((group) => (
               <List key={group.key} header={group.label}>
@@ -208,7 +220,7 @@ const ExpiringRow = memo(function ExpiringRow({
         <div className="px-4 pb-2 desktop:py-2 desktop:ps-0">
           <Button
             size="sm"
-            variant="destructive"
+            variant="destructive-plain"
             aria-label={`Dar de baja ${product.name}, lote ${lot.lotNumber}`}
             onClick={() =>
               onWriteOff({

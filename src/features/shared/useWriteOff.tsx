@@ -38,7 +38,7 @@ export function useWriteOff(): {
         label: 'Deshacer',
         onAction: () => {
           const undone = useInventoryStore.getState().undo(result.movementIds);
-          toast.show({ message: undone ? 'Baja deshecha.' : 'No se pudo deshacer la baja.' });
+          toast.show({ message: undone ? 'Baja deshecha' : 'No se pudo deshacer la baja.' });
         },
       },
     });

@@ -11,6 +11,11 @@ type StatOwnProps<T extends ElementType> = {
   /** Already formatted for display ("12", "$1,240.00", "—"). */
   value: ReactNode;
   detail?: ReactNode;
+  /**
+   * `large` (default) is for short figures ("12", "$1,240"). Use `compact` when the value is a
+   * phrase ("≈ 5 cajas + 16 pruebas") so it stays on one or two lines on a phone.
+   */
+  size?: 'large' | 'compact';
   /** Makes the stat a link. */
   href?: string;
   /** Makes the stat a button. */
@@ -25,6 +30,7 @@ export function Stat<T extends ElementType = 'div'>({
   label,
   value,
   detail,
+  size = 'large',
   className,
   ...rest
 }: StatProps<T>) {
@@ -50,7 +56,11 @@ export function Stat<T extends ElementType = 'div'>({
         {label}
         {interactive ? <ChevronRight size={16} aria-hidden="true" /> : null}
       </span>
-      <span className="text-large-title font-semibold tabular-nums leading-tight text-label">
+      <span
+        className={`font-semibold tabular-nums leading-tight text-balance text-label ${
+          size === 'compact' ? 'text-title2' : 'text-title1 sheet:text-large-title'
+        }`}
+      >
         {value}
       </span>
       {detail != null ? <span className="text-footnote text-label-secondary">{detail}</span> : null}

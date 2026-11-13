@@ -1,5 +1,6 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
+import { IconButton } from '../Button';
 import { useModalDialog } from '../internal/useModalDialog';
 import './sheet.css';
 
@@ -44,14 +45,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
               <h2 id={titleId} className="text-headline font-semibold text-label">
                 {title}
               </h2>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Cerrar"
-                className="flex size-(--hit-target) shrink-0 items-center justify-center rounded-full text-label-secondary hover:bg-fill"
-              >
-                <X aria-hidden="true" size={20} />
-              </button>
+              <IconButton icon={X} aria-label="Cerrar" onClick={onClose} />
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
           </>

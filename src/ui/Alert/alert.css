@@ -30,8 +30,7 @@
   }
 
   .alert::backdrop {
-    /* No scrim token yet: falls back to black at 40 % in both appearances. */
-    background: var(--color-scrim, color-mix(in srgb, black 40%, transparent));
+    background: var(--color-scrim);
     opacity: 0;
     transition:
       opacity var(--duration-fast) var(--ease),

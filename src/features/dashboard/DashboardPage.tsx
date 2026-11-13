@@ -55,9 +55,11 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 gap-8 desktop:grid-cols-2">
         <List header="Usar primero">
           {stats.useFirst.length === 0 ? (
-            <EmptyState icon={CircleCheck} title="Nada por usar">
-              No hay lotes con saldo que vencer.
-            </EmptyState>
+            <li>
+              <EmptyState icon={CircleCheck} title="Sin lotes con saldo">
+                Registra una entrada para ver aquí qué lote usar primero.
+              </EmptyState>
+            </li>
           ) : (
             stats.useFirst.map((item) => (
               <ListRow
@@ -101,9 +103,11 @@ export function DashboardPage() {
 
         <List header="Comprar pronto">
           {stats.buySoon.length === 0 ? (
-            <EmptyState icon={CircleCheck} title="Todo en orden">
-              No hay productos por comprar.
-            </EmptyState>
+            <li>
+              <EmptyState icon={CircleCheck} title="Todo en orden">
+                Ningún producto necesita compra por ahora.
+              </EmptyState>
+            </li>
           ) : (
             stats.buySoon.map((row) => (
               <ListRow

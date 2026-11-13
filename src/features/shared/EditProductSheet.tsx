@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Area, Product } from '@/domain/types';
 import { useInventoryStore } from '@/state/store';
 import { Button, NumberField, Select, Sheet, TextField, useToast } from '@/ui';
+import { useFocusFirstInvalid } from './forms';
 
 const BASE_UNITS = ['prueba', 'unidad', 'frasco', 'caja', 'bolsa'];
 
@@ -34,6 +35,7 @@ function EditForm({ product, areas, onClose }: EditFormProps) {
   const [code, setCode] = useState(product.code ?? '');
   const [cardNumber, setCardNumber] = useState(product.cardNumber ?? '');
   const [submitted, setSubmitted] = useState(false);
+  const { ref: formRef, focusFirstInvalid } = useFocusFirstInvalid();
 
   const errors: Record<string, string> = {};
   if (!name.trim()) errors.name = 'Ingresa el nombre del producto.';
@@ -50,7 +52,10 @@ function EditForm({ product, areas, onClose }: EditFormProps) {
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     setSubmitted(true);
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0) {
+      focusFirstInvalid();
+      return;
+    }
 
     let next: Product = { ...product, name: name.trim(), areaId, unit };
     next = withOptional(next, 'packaging', packaging.trim());
@@ -66,7 +71,7 @@ function EditForm({ product, areas, onClose }: EditFormProps) {
   };
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-4 p-4">
+    <form ref={formRef} onSubmit={submit} noValidate className="flex flex-col gap-4">
       <TextField label="Nombre" value={name} onChange={setName} error={shown('name')} autoFocus />
       <div className="grid grid-cols-1 gap-4 sheet:grid-cols-2">
         <Select
@@ -111,13 +116,13 @@ function EditForm({ product, areas, onClose }: EditFormProps) {
       />
       <div className="grid grid-cols-1 gap-4 sheet:grid-cols-2">
         <TextField label="Código" value={code} onChange={setCode} />
-        <TextField label="Nº de tarjeta" value={cardNumber} onChange={setCardNumber} />
+        <TextField label="N.º de tarjeta" value={cardNumber} onChange={setCardNumber} />
       </div>
       <div className="flex flex-wrap justify-end gap-2 pt-2">
         <Button type="button" variant="plain" onClick={onClose}>
           Cancelar
         </Button>
-        <Button type="submit">Guardar</Button>
+        <Button type="submit">Guardar cambios</Button>
       </div>
     </form>
   );

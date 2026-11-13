@@ -6,7 +6,8 @@ import { formatDate, formatQuantity } from '@/lib/format';
 import { useToday } from '@/state/selectors';
 import { useInventoryStore } from '@/state/store';
 import { Button, DateField, NumberField, Select, TextField, useToast } from '@/ui';
-import { parseDecimal } from '../shared/forms';
+import { FormError } from '../shared/FormError';
+import { parseDecimal, useFocusFirstInvalid } from '../shared/forms';
 import { ProductPicker } from '../shared/ProductPicker';
 
 interface ReceiveFormProps {
@@ -36,6 +37,8 @@ export function ReceiveForm({ initialProductId = '', onDone, onCancel }: Receive
   const [price, setPrice] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [confirmedWarning, setConfirmedWarning] = useState(false);
+  const [formError, setFormError] = useState<string>();
+  const { ref: formRef, focusFirstInvalid } = useFocusFirstInvalid();
 
   const product = data.products.find((p) => p.id === productId);
   const perPackage = product?.unitsPerPackage;
@@ -73,7 +76,11 @@ export function ReceiveForm({ initialProductId = '', onDone, onCancel }: Receive
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     setSubmitted(true);
-    if (Object.keys(errors).length > 0) return;
+    setFormError(undefined);
+    if (Object.keys(errors).length > 0) {
+      focusFirstInvalid();
+      return;
+    }
     if (warning && !confirmedWarning) {
       setConfirmedWarning(true); // show the warning, then confirm with a second click
       return;
@@ -90,7 +97,7 @@ export function ReceiveForm({ initialProductId = '', onDone, onCancel }: Receive
       ...(unitPrice !== null ? { unitPrice } : {}),
     });
     if (!result.ok) {
-      toast.show({ message: result.error });
+      setFormError(result.error); // a toast would sit behind the modal sheet
       return;
     }
     onDone();
@@ -102,7 +109,7 @@ export function ReceiveForm({ initialProductId = '', onDone, onCancel }: Receive
           const undone = useInventoryStore.getState().undo(result.movementIds);
           toast.show({
             message: undone
-              ? 'Entrada deshecha.'
+              ? 'Entrada deshecha'
               : 'No se pudo deshacer: ya hay movimientos posteriores de este lote.',
           });
         },
@@ -111,7 +118,7 @@ export function ReceiveForm({ initialProductId = '', onDone, onCancel }: Receive
   };
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-4 p-4">
+    <form ref={formRef} onSubmit={submit} noValidate className="flex flex-col gap-4">
       <ProductPicker
         products={data.products.filter((p) => !p.archived)}
         areaNames={new Map(data.areas.map((area) => [area.id, area.name]))}
@@ -131,7 +138,7 @@ export function ReceiveForm({ initialProductId = '', onDone, onCancel }: Receive
         />
         <TextField label="Concepto" value={concept} onChange={setConcept} />
         <TextField
-          label="Nº de lote"
+          label="N.º de lote"
           value={lotNumber}
           onChange={setLotNumber}
           autoCapitalize="characters"
@@ -206,6 +213,7 @@ export function ReceiveForm({ initialProductId = '', onDone, onCancel }: Receive
         </p>
       ) : null}
 
+      <FormError message={formError} />
       <div className="flex flex-wrap justify-end gap-2 pt-2">
         <Button type="button" variant="plain" onClick={onCancel}>
           Cancelar

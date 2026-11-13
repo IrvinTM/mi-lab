@@ -1,11 +1,15 @@
 import { LoaderCircle, type LucideIcon } from 'lucide-react';
 import { forwardRef, type ButtonHTMLAttributes, type MouseEvent } from 'react';
 
-export type ButtonVariant = 'filled' | 'tinted' | 'plain' | 'destructive';
+export type ButtonVariant = 'filled' | 'tinted' | 'plain' | 'destructive' | 'destructive-plain';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** Visual weight: `filled` for the main action, `destructive` for irreversible ones. */
+  /**
+   * Visual weight: `filled` for the main action of a view; `destructive` (red fill) for a single
+   * irreversible action; `destructive-plain` (red text) where a red fill would shout: alerts and
+   * actions repeated on every row.
+   */
   variant?: ButtonVariant;
   size?: ButtonSize;
   /** Optional leading icon (decorative: the text label names the action). */
@@ -16,10 +20,12 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
-  filled: 'bg-accent text-white hover:opacity-90 active:opacity-75',
-  tinted: 'bg-accent/15 text-accent hover:bg-accent/25 active:bg-accent/35',
+  filled: 'bg-accent-fill text-on-accent hover:bg-accent-fill-hover active:bg-accent-fill-active',
+  tinted: 'bg-accent/12 text-accent hover:bg-accent/16 active:bg-accent/20',
   plain: 'bg-transparent text-accent hover:bg-fill active:bg-fill',
-  destructive: 'bg-red text-white hover:opacity-90 active:opacity-75',
+  destructive:
+    'bg-danger-fill text-on-accent hover:bg-danger-fill-hover active:bg-danger-fill-active',
+  'destructive-plain': 'bg-transparent text-danger hover:bg-fill active:bg-fill',
 };
 
 // `sm` is compact on pointer devices but still reaches the 44 px target on touch screens.
@@ -56,7 +62,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 
   const classes = [
     'inline-flex items-center justify-center rounded-md font-semibold select-none',
-    'transition-[opacity,background-color] duration-(--duration-fast) ease-(--ease)',
+    'cursor-pointer transition-colors duration-(--duration-fast) ease-(--ease)',
     'disabled:opacity-40 disabled:pointer-events-none aria-disabled:cursor-default',
     VARIANT_CLASSES[variant],
     SIZE_CLASSES[size],

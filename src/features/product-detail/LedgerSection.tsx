@@ -56,7 +56,7 @@ export function LedgerSection({
           <span>{entry.concept}</span>
           {entry.fefoOverrideReason ? (
             <span className="flex items-start gap-1 text-footnote text-label-secondary">
-              <TriangleAlert aria-hidden="true" size={14} className="mt-0.5 shrink-0 text-orange" />
+              <TriangleAlert aria-hidden="true" size={14} className="mt-0.5 shrink-0 text-label" />
               <span>Fuera de orden FEFO: {entry.fefoOverrideReason}</span>
             </span>
           ) : null}

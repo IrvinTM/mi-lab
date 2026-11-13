@@ -80,7 +80,7 @@ describe('SettingsPage', () => {
       const max = screen.getByLabelText('Existencia máxima por defecto (meses de consumo)');
       await user.clear(max);
       await user.type(max, '2');
-      await user.click(screen.getByRole('button', { name: 'Guardar' }));
+      await user.click(screen.getByRole('button', { name: 'Guardar ajustes' }));
 
       expect(settings()).toMatchObject({
         labName: 'Lab Central',
@@ -103,7 +103,7 @@ describe('SettingsPage', () => {
       const min = screen.getByLabelText('Existencia mínima por defecto (meses de consumo)');
       await user.clear(min);
       await user.type(min, '5');
-      await user.click(screen.getByRole('button', { name: 'Guardar' }));
+      await user.click(screen.getByRole('button', { name: 'Guardar ajustes' }));
 
       expect(screen.getByText('Escribe el nombre del laboratorio.')).toBeInTheDocument();
       expect(screen.getAllByText('Ingresa un número entero de 1 o más.')).toHaveLength(2);
@@ -124,7 +124,7 @@ describe('SettingsPage', () => {
       const critical = screen.getByLabelText('Días para estado crítico');
       await user.clear(critical);
       await user.type(critical, '90');
-      await user.click(screen.getByRole('button', { name: 'Guardar' }));
+      await user.click(screen.getByRole('button', { name: 'Guardar ajustes' }));
       expect(
         screen.getByText('Los días de advertencia deben ser más que los días críticos.'),
       ).toBeInTheDocument();
@@ -312,12 +312,12 @@ describe('SettingsPage', () => {
 
       await user.clear(field);
       await user.type(field, 'quimica seca');
-      await user.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+      await user.click(within(dialog).getByRole('button', { name: 'Renombrar' }));
       expect(within(dialog).getByText('Ya existe un área con ese nombre.')).toBeInTheDocument();
 
       await user.clear(field);
       await user.type(field, 'Banco de sangre');
-      await user.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+      await user.click(within(dialog).getByRole('button', { name: 'Renombrar' }));
       expect(useInventoryStore.getState().data.areas[1]!.name).toBe('Banco de sangre');
     });
 

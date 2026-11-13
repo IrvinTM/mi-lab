@@ -8,10 +8,21 @@ export function PageActions({ productId }: { productId?: string }) {
   const query = productId ? `?producto=${encodeURIComponent(productId)}` : '';
   return (
     <>
-      <Button icon={Plus} onClick={() => void navigate(`/entrada${query}`)}>
+      <Button
+        icon={Plus}
+        title="Registrar entrada (N)"
+        aria-keyshortcuts="N"
+        onClick={() => void navigate(`/entrada${query}`)}
+      >
         Entrada
       </Button>
-      <Button icon={Minus} variant="tinted" onClick={() => void navigate(`/salida${query}`)}>
+      <Button
+        icon={Minus}
+        variant="tinted"
+        title="Registrar salida (S)"
+        aria-keyshortcuts="S"
+        onClick={() => void navigate(`/salida${query}`)}
+      >
         Salida
       </Button>
     </>

@@ -62,7 +62,7 @@ export function FieldShell({
       })}
       {hasError ? (
         <p id={errorId} className="flex items-start gap-1 text-footnote text-label">
-          <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-red" />
+          <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-danger" />
           <span>{error}</span>
         </p>
       ) : null}

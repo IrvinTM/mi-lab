@@ -104,7 +104,7 @@ describe('DashboardPage edge cases', () => {
     data.lots = [];
     load(data);
     renderPage();
-    expect(screen.getByText('Nada por usar')).toBeInTheDocument();
+    expect(screen.getByText('Sin lotes con saldo')).toBeInTheDocument();
     const indicators = screen.getByRole('region', { name: 'Indicadores' });
     expect(within(indicators).getAllByText('0').length).toBeGreaterThanOrEqual(2);
   });

@@ -24,7 +24,7 @@ export function TabBar({ items, className }: TabBarProps) {
           to={to}
           end={end}
           className={({ isActive }) =>
-            `flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-caption ${
+            `flex min-h-(--tabbar-height) min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-caption ${
               isActive ? 'font-semibold text-label' : 'text-label-secondary'
             }`
           }

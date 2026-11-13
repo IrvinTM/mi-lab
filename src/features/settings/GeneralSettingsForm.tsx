@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import type { Settings } from '@/domain/types';
 import { useInventoryStore } from '@/state/store';
 import { Button, NumberField, TextField, useToast } from '@/ui';
+import { useFocusFirstInvalid } from '../shared/forms';
 import { SettingsSection } from './SettingsSection';
 
 const WHOLE_NUMBER = 'Ingresa un número entero de 1 o más.';
@@ -48,6 +49,7 @@ export function GeneralSettingsForm() {
   const settings = useInventoryStore((state) => state.data.settings);
   const [drafts, setDrafts] = useState(() => toDrafts(settings));
   const [submitted, setSubmitted] = useState(false);
+  const { ref: formRef, focusFirstInvalid } = useFocusFirstInvalid();
 
   // Stored settings changed from outside (restored backup, demo reset): show them.
   const stored = JSON.stringify(toDrafts(settings));
@@ -67,7 +69,10 @@ export function GeneralSettingsForm() {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setSubmitted(true);
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0) {
+      focusFirstInvalid();
+      return;
+    }
     useInventoryStore.getState().updateSettings({
       labName: drafts.labName.trim(),
       criticalDays: drafts.criticalDays!,
@@ -80,7 +85,7 @@ export function GeneralSettingsForm() {
   };
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-8">
+    <form ref={formRef} onSubmit={submit} noValidate className="flex flex-col gap-8">
       <SettingsSection title="Laboratorio">
         <TextField
           label="Nombre del laboratorio"
@@ -132,7 +137,7 @@ export function GeneralSettingsForm() {
       </SettingsSection>
 
       <div>
-        <Button type="submit">Guardar</Button>
+        <Button type="submit">Guardar ajustes</Button>
       </div>
     </form>
   );

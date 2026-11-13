@@ -66,7 +66,7 @@ export function LotsSection({ row, today, settings, fundingSources }: LotsSectio
       <span className="flex items-center gap-1">
         <Button
           size="sm"
-          variant="destructive"
+          variant="destructive-plain"
           aria-label={`Dar de baja el lote ${entry.lot.lotNumber}`}
           onClick={() => requestWriteOff(target(entry))}
         >

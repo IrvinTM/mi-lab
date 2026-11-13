@@ -49,9 +49,19 @@ export function AppShell({ title, items, settings, notice, children }: AppShellP
             <NavLink
               to={settings.to}
               aria-label={settings.label}
-              className="flex size-(--hit-target) items-center justify-center text-label-secondary"
+              className={({ isActive }) =>
+                `flex size-(--hit-target) items-center justify-center ${
+                  isActive ? 'text-accent' : 'text-label-secondary'
+                }`
+              }
             >
-              <SettingsIcon aria-hidden="true" className="size-6" strokeWidth={1.75} />
+              {({ isActive }) => (
+                <SettingsIcon
+                  aria-hidden="true"
+                  className="size-6"
+                  strokeWidth={isActive ? 2.25 : 1.75}
+                />
+              )}
             </NavLink>
           ) : null}
         </header>

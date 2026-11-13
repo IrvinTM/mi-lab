@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useProductRows, useToday } from '@/state/selectors';
 import { useInventoryStore } from '@/state/store';
-import { Button, EmptyState, PageHeader } from '@/ui';
+import { Button, EmptyState, PageHeader, useDocumentTitle } from '@/ui';
 import { EditProductSheet } from '../shared/EditProductSheet';
 import { PageActions } from '../shared/PageActions';
 import { LedgerSection } from './LedgerSection';
@@ -21,6 +21,7 @@ export function ProductDetailPage() {
   const settings = useInventoryStore((state) => state.data.settings);
   const row = rows.find((candidate) => candidate.product.id === id);
   const [editing, setEditing] = useState(false);
+  useDocumentTitle(row ? row.product.name : 'Producto no encontrado');
 
   if (!row) {
     return (

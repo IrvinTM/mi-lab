@@ -116,7 +116,7 @@ export function BackupSection() {
           Reemplaza todos los datos actuales por los de un respaldo descargado antes.
         </p>
         {error ? (
-          <p role="alert" className="text-footnote text-red">
+          <p role="alert" className="text-footnote text-danger">
             {error}
           </p>
         ) : null}

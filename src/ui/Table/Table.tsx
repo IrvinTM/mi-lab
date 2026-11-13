@@ -1,4 +1,4 @@
-import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 
 export type SortDirection = 'ascending' | 'descending';
@@ -51,6 +51,25 @@ function resolveAlign<Row>(column: TableColumn<Row>) {
   return column.align ?? (column.numeric ? 'end' : 'start');
 }
 
+/**
+ * Whether the element's content is wider than its box. A scrollable box must be focusable so
+ * keyboard users can scroll it; one that fits must not add a useless Tab stop.
+ */
+function useOverflowsX<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const measure = () => setOverflows(element.scrollWidth > element.clientWidth);
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    if (element.firstElementChild) observer.observe(element.firstElementChild);
+    return () => observer.disconnect();
+  }, []);
+  return { ref, overflows };
+}
+
 export function Table<Row>({
   caption,
   columns,
@@ -61,6 +80,7 @@ export function Table<Row>({
   onRowClick,
   empty,
 }: TableProps<Row>) {
+  const { ref: scrollRef, overflows } = useOverflowsX<HTMLDivElement>();
   const toggleSort = (column: TableColumn<Row>) => {
     const direction: SortDirection =
       sort?.key === column.key && sort.direction === 'ascending' ? 'descending' : 'ascending';
@@ -74,7 +94,14 @@ export function Table<Row>({
   };
 
   return (
-    <div className="overflow-x-auto rounded-md bg-bg-elevated">
+    <div
+      ref={scrollRef}
+      // Named, focusable region only while it scrolls sideways (arrow keys then scroll it).
+      role={overflows ? 'region' : undefined}
+      aria-label={overflows ? caption : undefined}
+      tabIndex={overflows ? 0 : undefined}
+      className="overflow-x-auto rounded-md bg-bg-elevated -outline-offset-3"
+    >
       <table className="w-full border-collapse text-body text-label">
         <caption className="sr-only">{caption}</caption>
         <thead>
@@ -105,7 +132,7 @@ export function Table<Row>({
                         <ChevronsUpDown
                           aria-hidden="true"
                           size={14}
-                          className="text-label-tertiary"
+                          className="text-label-secondary"
                         />
                       )}
                     </button>
