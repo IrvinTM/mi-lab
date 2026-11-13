@@ -1,0 +1,233 @@
+{
+  "_fuente": "Transcrito de 'inventario de octubre (PDF)' y 'Cardex digital 2024 (PDF)'. Valores tal cual el documento original; los totales de 'pruebas' a veces no cuadran con reserva*unidades+uso (errores del Excel original), conservarlos tal cual.",
+  "_campos": {
+    "reserva": "Cajas/unidades cerradas en bodega. Número o texto libre si el original lo trae así (p.ej. '3 FRASCOS').",
+    "uso": "Pruebas/unidades restantes en la presentación abierta. null si el original trae '-' o 'SI'.",
+    "pruebas": "Total de pruebas disponibles según el original. null si no aplica.",
+    "pruebasPorCaja": "Pruebas por presentación (caja). null si se desconoce."
+  },
+  "areas": [
+    {
+      "id": "quimica-seca",
+      "nombre": "Química seca",
+      "pruebasPorCaja": 24,
+      "items": [
+        { "nombre": "Glucosa", "reserva": 5, "uso": 24, "pruebas": 144 },
+        { "nombre": "Colesterol", "reserva": 7, "uso": 5, "pruebas": 173 },
+        { "nombre": "Triglicéridos", "reserva": 6, "uso": 24, "pruebas": 168 },
+        { "nombre": "Ácido úrico", "reserva": 4, "uso": 17, "pruebas": 111 },
+        { "nombre": "Creatinina", "reserva": 4, "uso": 24, "pruebas": 120 },
+        { "nombre": "Nitrógeno ureico", "reserva": 3, "uso": 18, "pruebas": 85 },
+        { "nombre": "TGO", "reserva": 6, "uso": 24, "pruebas": 168 },
+        { "nombre": "TGP", "reserva": 7, "uso": 7, "pruebas": 173 },
+        { "nombre": "Bilirrubina total", "reserva": 5, "uso": 10, "pruebas": 121 },
+        { "nombre": "Bilirrubina directa", "reserva": 4, "uso": 9, "pruebas": 120 },
+        { "nombre": "Electrolitos", "reserva": 5, "uso": 16, "pruebas": 136 },
+        { "nombre": "Amilasa", "reserva": 3, "uso": 5, "pruebas": 89 },
+        { "nombre": "Lipasa", "reserva": 3, "uso": 21, "pruebas": 87 },
+        { "nombre": "Fosfatasa alcalina", "reserva": 3, "uso": 21, "pruebas": 85 },
+        { "nombre": "Fósforo", "reserva": 3, "uso": 17, "pruebas": 84 },
+        { "nombre": "Calcio", "reserva": 2, "uso": 22, "pruebas": 55 },
+        { "nombre": "Albúmina", "reserva": 2, "uso": 12, "pruebas": 60 },
+        { "nombre": "HDL", "reserva": 4, "uso": 12, "pruebas": 100 },
+        { "nombre": "LDH", "reserva": 2, "uso": 20, "pruebas": 68 },
+        { "nombre": "Proteínas totales", "reserva": 2, "uso": 21, "pruebas": 67 },
+        { "nombre": "GGT", "reserva": 3, "uso": 14, "pruebas": 77 },
+        { "nombre": "Magnesio", "reserva": 2, "uso": 13, "pruebas": 72 },
+        { "nombre": "CKMB", "reserva": 0, "uso": 25, "pruebas": 22 },
+        { "nombre": "CPK", "reserva": 1, "uso": 22, "pruebas": 46 },
+        { "nombre": "Líquido de referencia electrolitos", "reserva": "3 FRASCOS", "uso": 1, "pruebas": null, "pruebasPorCaja": null },
+        { "nombre": "Control N1", "reserva": "2 FRASCOS", "uso": null, "pruebas": null, "pruebasPorCaja": null },
+        { "nombre": "Control N2", "reserva": "2 FRASCOS", "uso": null, "pruebas": null, "pruebasPorCaja": null }
+      ]
+    },
+    {
+      "id": "pruebas-especiales",
+      "nombre": "Pruebas especiales",
+      "pruebasPorCaja": 25,
+      "items": [
+        { "nombre": "PCR", "reserva": 3, "uso": 4, "pruebas": 79 },
+        { "nombre": "LH", "reserva": 0, "uso": 23, "pruebas": 23 },
+        { "nombre": "Beta HCG", "reserva": 0, "uso": 25, "pruebas": 25 },
+        { "nombre": "CA 125", "reserva": 0, "uso": 22, "pruebas": 23 },
+        { "nombre": "PSA libre", "reserva": 1, "uso": 16, "pruebas": 41 },
+        { "nombre": "PSA total", "reserva": 1, "uso": 12, "pruebas": 37 },
+        { "nombre": "Ferritina", "reserva": 0, "uso": 21, "pruebas": 21 },
+        { "nombre": "Vitamina D", "reserva": 0, "uso": 13, "pruebas": 13 },
+        { "nombre": "Hemoglobina glicosilada", "reserva": 1, "uso": 20, "pruebas": 45 },
+        { "nombre": "Testosterona", "reserva": 0, "uso": 20, "pruebas": 20 },
+        { "nombre": "Insulina", "reserva": 0, "uso": 14, "pruebas": 17 },
+        { "nombre": "T4 total", "reserva": 1, "uso": 14, "pruebas": 45 },
+        { "nombre": "T3 total", "reserva": 1, "uso": 12, "pruebas": 44 },
+        { "nombre": "TSH", "reserva": 1, "uso": 22, "pruebas": 32 },
+        { "nombre": "Prolactina", "reserva": 0, "uso": 22, "pruebas": 25 },
+        { "nombre": "Cortisol", "reserva": 0, "uso": 12, "pruebas": 20 },
+        { "nombre": "Dengue", "reserva": 1, "uso": 18, "pruebas": 57 },
+        { "nombre": "Toxoplasma", "reserva": 0, "uso": 23, "pruebas": 23 },
+        { "nombre": "Dímero D", "reserva": 1, "uso": 16, "pruebas": 45 },
+        { "nombre": "Factor reumatoide", "reserva": 0, "uso": 14, "pruebas": 14 },
+        { "nombre": "Procalcitonina", "reserva": 0, "uso": 5, "pruebas": 11 },
+        { "nombre": "Troponina I", "reserva": 1, "uso": 1, "pruebas": 31 },
+        { "nombre": "H. pylori en heces cuantitativo", "reserva": 1, "uso": 6, "pruebas": 35 },
+        { "nombre": "NT-proBNP", "reserva": 1, "uso": 2, "pruebas": 31 },
+        { "nombre": "Alfafetoproteína", "reserva": 0, "uso": 24, "pruebas": 24 },
+        { "nombre": "T4 libre", "reserva": 1, "uso": 6, "pruebas": 36 },
+        { "nombre": "CA 19-9", "reserva": 0, "uso": 22, "pruebas": 22 },
+        { "nombre": "Microalbúmina", "reserva": 0, "uso": 21, "pruebas": 21 },
+        { "nombre": "H. pylori en sangre", "reserva": 0, "uso": 21, "pruebas": 25 },
+        { "nombre": "H. pylori en heces cualitativo", "reserva": 0, "uso": 6, "pruebas": 18 },
+        { "nombre": "Dengue NS1 Ag", "reserva": 1, "uso": 25, "pruebas": 48 },
+        { "nombre": "Gonorrea y clamidia", "reserva": 0, "uso": 6, "pruebas": 6 }
+      ]
+    },
+    {
+      "id": "coagulacion",
+      "nombre": "Coagulación",
+      "pruebasPorCaja": null,
+      "items": [
+        { "nombre": "TP", "reserva": 17, "uso": 1, "pruebas": null },
+        { "nombre": "TTP", "reserva": 1, "uso": 1, "pruebas": null },
+        { "nombre": "Fibrinógeno", "reserva": 1, "uso": 1, "pruebas": null },
+        { "nombre": "Control normal (coagulación)", "reserva": 2, "uso": 0, "pruebas": null },
+        { "nombre": "Control patológico (coagulación)", "reserva": 2, "uso": 0, "pruebas": null }
+      ]
+    },
+    {
+      "id": "hematologia",
+      "nombre": "Hematología",
+      "pruebasPorCaja": null,
+      "items": [
+        { "nombre": "Lisante", "reserva": 1, "uso": 1, "pruebas": null },
+        { "nombre": "Rinse", "reserva": 2, "uso": 1, "pruebas": null },
+        { "nombre": "Diluyente", "reserva": 1, "uso": 1, "pruebas": null },
+        { "nombre": "Plaquetas", "reserva": 0, "uso": 16, "pruebas": 16 }
+      ]
+    },
+    {
+      "id": "inmunohematologia",
+      "nombre": "Inmunohematología",
+      "pruebasPorCaja": null,
+      "items": [
+        { "nombre": "Sangre oculta en heces", "reserva": 1, "pruebasPorCaja": 10, "uso": 7, "pruebas": 17 },
+        { "nombre": "Sífilis PRS", "reserva": 1, "pruebasPorCaja": 25, "uso": 5, "pruebas": 30 },
+        { "nombre": "Pruebas de embarazo", "reserva": 2, "pruebasPorCaja": 25, "uso": 1, "pruebas": 51 },
+        { "nombre": "Sífilis RPR carbón", "reserva": 0, "uso": 1, "pruebas": null },
+        { "nombre": "Factor reumatoide látex", "reserva": 0, "uso": 1, "pruebas": null },
+        { "nombre": "ASO látex", "reserva": 0, "uso": 1, "pruebas": null },
+        { "nombre": "PCR látex", "reserva": 0, "uso": 1, "pruebas": null },
+        { "nombre": "Antígenos febriles", "reserva": 0, "uso": 1, "pruebas": null },
+        { "nombre": "Salmonella typhi en heces", "reserva": 0, "uso": 19, "pruebas": 19 }
+      ]
+    },
+    {
+      "id": "banco-de-sangre",
+      "nombre": "Banco de sangre",
+      "pruebasPorCaja": null,
+      "items": [
+        { "nombre": "VIH", "reserva": 1, "pruebasPorCaja": 25, "uso": 22, "pruebas": 47 },
+        { "nombre": "Hepatitis B", "reserva": 0, "uso": 21, "pruebas": 21 },
+        { "nombre": "Hepatitis C", "reserva": 0, "uso": 22, "pruebas": 22 },
+        { "nombre": "Anti A", "reserva": 2, "uso": 1, "pruebas": null },
+        { "nombre": "Anti B", "reserva": 2, "uso": 1, "pruebas": null },
+        { "nombre": "Anti D", "reserva": 2, "uso": 1, "pruebas": null },
+        { "nombre": "Albúmina bovina", "reserva": 1, "uso": 1, "pruebas": null },
+        { "nombre": "Antiglobulina humana", "reserva": 1, "uso": 1, "pruebas": null }
+      ]
+    },
+    {
+      "id": "uroanalisis",
+      "nombre": "Uroanálisis",
+      "pruebasPorCaja": null,
+      "items": [
+        { "nombre": "Tiras reactivas", "reserva": 2, "uso": 1, "pruebas": null }
+      ]
+    },
+    {
+      "id": "drogas",
+      "nombre": "Drogas",
+      "pruebasPorCaja": null,
+      "items": [
+        { "nombre": "Set 7 drogas en orina", "reserva": 0, "uso": 6, "pruebas": 6 }
+      ]
+    },
+    {
+      "id": "quimica-humeda",
+      "nombre": "Química húmeda",
+      "pruebasPorCaja": null,
+      "items": [
+        { "nombre": "Glucosa (química húmeda)", "reserva": 1, "uso": 1, "pruebas": null },
+        { "nombre": "Colesterol (química húmeda)", "reserva": 1, "uso": 1, "pruebas": null },
+        { "nombre": "Triglicéridos (química húmeda)", "reserva": 1, "uso": 1, "pruebas": null },
+        { "nombre": "Ácido úrico (química húmeda)", "reserva": 0, "uso": 1, "pruebas": null },
+        { "nombre": "Creatinina (química húmeda)", "reserva": 0, "uso": 1, "pruebas": null },
+        { "nombre": "Nitrógeno ureico (química húmeda)", "reserva": 1, "uso": 1, "pruebas": null },
+        { "nombre": "TGO (química húmeda)", "reserva": 0, "uso": 1, "pruebas": null },
+        { "nombre": "TGP (química húmeda)", "reserva": 1, "uso": 1, "pruebas": null },
+        { "nombre": "Proteínas totales (química húmeda)", "reserva": 1, "uso": 1, "pruebas": null },
+        { "nombre": "Control normal (química húmeda)", "reserva": 2, "uso": 1, "pruebas": null },
+        { "nombre": "Control patológico (química húmeda)", "reserva": 3, "uso": 1, "pruebas": null }
+      ]
+    },
+    {
+      "id": "insumos",
+      "nombre": "Insumos",
+      "pruebasPorCaja": null,
+      "items": [
+        { "nombre": "Jeringas 1 ml", "reserva": 0, "uso": null, "pruebas": null },
+        { "nombre": "Jeringas 3 ml", "reserva": 3, "uso": null, "pruebas": null },
+        { "nombre": "Jeringas 5 ml", "reserva": 3, "uso": null, "pruebas": null },
+        { "nombre": "Jeringas 10 ml", "reserva": 2, "uso": null, "pruebas": null },
+        { "nombre": "Jeringas 20 ml", "reserva": 0, "uso": null, "pruebas": null },
+        { "nombre": "Caja de curitas", "reserva": 4, "uso": null, "pruebas": null },
+        { "nombre": "Guantes S", "reserva": 4, "uso": null, "pruebas": null },
+        { "nombre": "Guantes M", "reserva": 3, "uso": null, "pruebas": null },
+        { "nombre": "Algodón", "reserva": "1/2", "uso": null, "pruebas": null },
+        { "nombre": "Puntas amarillas", "reserva": "3 BOLSAS", "uso": null, "pruebas": null },
+        { "nombre": "Puntas azules", "reserva": "4 BOLSAS", "uso": null, "pruebas": null },
+        { "nombre": "Tubo pediátrico", "reserva": 200, "uso": null, "pruebas": null },
+        { "nombre": "Tubo amarillo / gel", "reserva": 400, "uso": null, "pruebas": null },
+        { "nombre": "Tubo rojo / activador", "reserva": 0, "uso": null, "pruebas": null },
+        { "nombre": "Tubo morado", "reserva": 200, "uso": null, "pruebas": null },
+        { "nombre": "Tubo celeste", "reserva": 300, "uso": null, "pruebas": null },
+        { "nombre": "Aguja para vacutainer", "reserva": "1 CAJA", "uso": null, "pruebas": null },
+        { "nombre": "Agujas Nipro", "reserva": "3 CAJAS", "uso": null, "pruebas": null },
+        { "nombre": "Autotips Fuji", "reserva": "1 CAJA", "uso": null, "pruebas": null },
+        { "nombre": "Agua estéril", "reserva": "1 CAJA", "uso": null, "pruebas": null },
+        { "nombre": "Cuvetas Diacheck", "reserva": "1/2 CAJA", "uso": null, "pruebas": null }
+      ]
+    }
+  ],
+  "cardex": {
+    "_fuente": "Cardex digital 2024 (PDF). Todas las tarjetas están vacías (sin movimientos). minimo/maximo null = vacío en el original (causa del #DIV/0! en el Excel).",
+    "procedencias": [
+      { "codigo": 1, "nombre": "GOES" },
+      { "codigo": 2, "nombre": "PL/480-90" },
+      { "codigo": 3, "nombre": "O.P.S" },
+      { "codigo": 4, "nombre": "RHESSA" },
+      { "codigo": 5, "nombre": "APSISA" },
+      { "codigo": 6, "nombre": "Materno infantil" },
+      { "codigo": 7, "nombre": "Malaria" },
+      { "codigo": 8, "nombre": "FOSALUD" },
+      { "codigo": 9, "nombre": "Planificación familiar" },
+      { "codigo": 10, "nombre": "Epidemiología" },
+      { "codigo": 11, "nombre": "Supervivencia infantil" },
+      { "codigo": 12, "nombre": "Patronatos" },
+      { "codigo": 13, "nombre": "PLP/480-91" },
+      { "codigo": 14, "nombre": "Donativos" },
+      { "codigo": 15, "nombre": "UNICEF" },
+      { "codigo": 16, "nombre": "Otros" }
+    ],
+    "tarjetas": [
+      { "numero": "LRC-01-24", "codigo": "30106226", "nombre": "Prueba para la determinación de Hemograma automatizado", "presentacion": "Set", "unidad": "C/U", "minimo": 1260, "maximo": 3780, "consumoPromedio": 1260 },
+      { "numero": "LRC-02-24", "codigo": "30106548", "nombre": "Prueba para la determinación de Glucosa automatizada", "presentacion": "Vial", "unidad": "C/U", "minimo": 1465, "maximo": 4395, "consumoPromedio": 1465 },
+      { "numero": "LRC-03-24", "codigo": "30106496", "nombre": "Prueba para la determinación de Colesterol automatizado", "presentacion": "Vial", "unidad": "C/U", "minimo": 1260, "maximo": 3780, "consumoPromedio": 1260, "_nota": "Número de tarjeta ausente en el original; inferido." },
+      { "numero": "LRC-04-23", "codigo": "30106670", "nombre": "Prueba para la determinación de Triglicéridos automatizado", "presentacion": "Vial", "unidad": "C/U", "minimo": 1277, "maximo": 3681, "consumoPromedio": 1277 },
+      { "numero": "LRC-05-24", "codigo": "30106346", "nombre": "Prueba para la determinación de Ácido úrico automatizado", "presentacion": null, "unidad": "C/U", "minimo": 1022, "maximo": 3066, "consumoPromedio": 1022 },
+      { "numero": "LRC-06-24", "codigo": "30106508", "nombre": "Prueba para la determinación de Creatinina automatizada", "presentacion": null, "unidad": "C/U", "minimo": 1200, "maximo": 4800, "consumoPromedio": 1321 },
+      { "numero": "LRC-07-24", "codigo": "30106684", "nombre": "Prueba para la determinación de Urea automatizada", "presentacion": null, "unidad": "C/U", "minimo": 1200, "maximo": 4800, "consumoPromedio": 1321, "_nota": "El original repite LRC-06-24 (error de copia); se renumera." },
+      { "numero": "LRC-09-24", "codigo": "30106484", "nombre": "Prueba para la determinación de Colesterol HDL automatizado", "presentacion": null, "unidad": "C/U", "minimo": null, "maximo": null, "consumoPromedio": 250 },
+      { "numero": "LRC-10-24", "codigo": "30106490", "nombre": "Prueba para la determinación de Colesterol LDL automatizado", "presentacion": "Vial", "unidad": "C/U", "minimo": null, "maximo": null, "consumoPromedio": 250 },
+      { "numero": "LRC-22-24", "codigo": "30106061", "nombre": "Prueba para la detección de 14 o más genotipos de VPH de alto riesgo (hibridación de ácidos nucleicos)", "presentacion": "Set", "unidad": "C/U", "minimo": null, "maximo": null, "consumoPromedio": 4 }
+    ]
+  }
+}
