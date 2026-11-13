@@ -2,8 +2,8 @@ import { render, screen } from '@testing-library/react';
 import App from './App';
 
 describe('App', () => {
-  it('shows the app name', () => {
+  it('shows the loading state while the data loads', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'Mi-lab' })).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Cargando');
   });
 });

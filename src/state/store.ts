@@ -127,6 +127,8 @@ export function createInventoryStore(repository: InventoryRepository, options: S
       data: emptyData(),
 
       init() {
+        // Already loaded (or failed): nothing to do. Also protects data set up by tests.
+        if (get().status !== 'loading') return Promise.resolve();
         initPromise ??= (async () => {
           try {
             const stored = await repository.load();
