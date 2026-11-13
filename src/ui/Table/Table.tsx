@@ -88,13 +88,13 @@ export function Table<Row>({
                   key={column.key}
                   scope="col"
                   aria-sort={sortable ? (sorted ?? 'none') : undefined}
-                  className={`p-0 text-footnote font-[600] text-label-secondary ${alignClass[align]}`}
+                  className={`p-0 text-footnote font-semibold text-label-secondary ${alignClass[align]}`}
                 >
                   {sortable ? (
                     <button
                       type="button"
                       onClick={() => toggleSort(column)}
-                      className={`flex min-h-11 w-full cursor-pointer items-center gap-1 px-4 text-footnote font-[600] hover:text-label focus-visible:text-label -outline-offset-3 ${justifyClass[align]}`}
+                      className={`flex min-h-11 w-full cursor-pointer items-center gap-1 px-4 text-footnote font-semibold hover:text-label focus-visible:text-label -outline-offset-3 ${justifyClass[align]}`}
                     >
                       {column.header}
                       {sorted === 'ascending' ? (
