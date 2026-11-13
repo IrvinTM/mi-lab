@@ -67,7 +67,7 @@ export function ProductDetailPage() {
       </div>
       <ProductMetrics row={row} />
       <LotsSection row={row} today={today} settings={settings} fundingSources={fundingSources} />
-      <LedgerSection productId={product.id} fundingSources={fundingSources} />
+      <LedgerSection row={row} fundingSources={fundingSources} />
       <EditProductSheet product={product} open={editing} onClose={() => setEditing(false)} />
     </div>
   );
