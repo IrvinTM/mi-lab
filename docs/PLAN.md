@@ -621,7 +621,7 @@ claro/oscuro, ancho 375 px y 1280 px, y navegación solo con teclado.
 - [x] **T1.6** `projection.ts` + tests (§6.5). Casos: consumo alto → sin pérdida; lote lejano
   detrás de uno grande → pérdida parcial; consumo 0 → `null`; lote que vence antes de que se
   agote el anterior → pérdida total.
-- [ ] **T1.7** `reorder.ts` + tests (§6.8, incluye redondeo a cajas y `unknown`).
+- [x] **T1.7** `reorder.ts` + tests (§6.8, incluye redondeo a cajas y `unknown`).
 - [ ] **T1.8** `ledger.ts` + tests (§6.9; cobertura `null` sin consumo — regresión del `#DIV/0!`).
 - [ ] **T1.9** `validation.ts` + tests (§6.10).
 
@@ -736,4 +736,5 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 | 2026-11-13 | La exportación a CSV (T6.1, `lib/csv.ts`, botones de exportar y selección/cantidades editables en Compras) sale del MVP. Se mantienen respaldo/restauración JSON e imprimir kardex | Decisión del usuario; el respaldo JSON protege los datos locales |
 | 2026-11-13 | Consumo (§6.7): ventana = `months` meses calendario hasta hoy, (hoy − 3 meses, hoy]; solo movimientos `issue` de ese producto con fecha ≤ hoy; divisor = días de historial desde la primera salida ÷ 30.4375, con tope en `months` (si hay < 1 mes de historial → `null`). `effectiveAvg` devuelve `{ value, source: 'calculated' \| 'manual', months? }` o `null`; un calculado de 0 cae al manual y un manual ≤ 0 se trata como sin consumo | §6.7 no definía "meses completos" ni el divisor con historial corto; no diluir el promedio y nunca devolver 0 que cause divisiones por cero |
 | 2026-11-13 | Proyección (§6.5): `projectExpiry(lots, avgMonthlyConsumption, today)` devuelve `{ lots[{ lotId, projectedUsed, projectedWaste, runsOutOn }], totalWaste, effectiveCoverageMonths }` o `null` sin consumo (≤ 0 o `null`); solo lotes usables con saldo, en orden FEFO; `runsOutOn` redondea hacia arriba los días; la rama `rate <= 0` del pseudocódigo no existe porque ese caso devuelve `null` | Coherente con "consumo 0 → null" de T1.6 |
+| 2026-11-13 | Compras (§6.8): `evaluateReorder({ product, usableBalance, projectedWaste, avgMonthlyConsumption, settings })` → `{ status, min?, max?, stockForDecision, suggestedQty?, suggestedPackages? }`. Orden de decisión: `out` → `reorder` → `excess` → `unknown` (sin mínimo) → `ok`; con mínimo y sin máximo el estado es `ok`. `suggestedQty` se calcula siempre que haya máximo (0 si hay exceso); sin `unitsPerPackage` se redondea a entero | §6.8 no fijaba la precedencia de estados ni el caso sin presentación |
 | 2026-11-13 | Tarjeta de Urea renumerada a LRC-07-24 en el seed | El original duplica LRC-06-24 |
