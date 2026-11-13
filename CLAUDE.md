@@ -9,12 +9,17 @@ salidas FEFO (sale primero lo que vence primero) y sugerencias de compra.
 - **Diseño:** antes de cualquier trabajo de interfaz, carga la skill `apple-design`
   (`.claude/skills/apple-design/SKILL.md`) y los archivos de referencia listados en PLAN §8.
   Usa solo los tokens de `src/styles/tokens.css`; no colores ni tamaños sueltos.
+- **Estilos:** Tailwind v4 (sin CSS Modules). Los tokens viven en `@theme static` de `tokens.css` y
+  generan las utilidades (`bg-bg-grouped`, `text-label-secondary`, `text-title2`, `rounded-md`…).
+  La paleta y escalas por defecto de Tailwind están desactivadas: no uses `bg-red-500`, `text-sm`
+  ni valores arbitrarios de color (`bg-[#fff]`). Usa CSS propio en `global.css` solo para lo que
+  las utilidades no cubren (p. ej. `@media print`).
 
 ## Reglas
 
 - Gestor de paquetes: **pnpm** (no uses `npm` ni `yarn`; no crees `package-lock.json`). Comandos:
   `pnpm install`, `pnpm dev`, `pnpm run check`, `pnpm run build`, `pnpm add [-D] <pkg>`.
-- Stack: React + Vite + TypeScript estricto, Zustand, CSS Modules, Vitest. No agregues
+- Stack: React + Vite + TypeScript estricto, Zustand, Tailwind CSS v4, Vitest. No agregues
   dependencias que no estén en PLAN §4 sin registrarlas ahí con su motivo.
 - Código, nombres y comentarios en **inglés**; todo texto visible en **español** (es-SV).
   Glosario en PLAN §3.

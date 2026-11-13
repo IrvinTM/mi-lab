@@ -70,7 +70,7 @@ importación directa de Excel, notificaciones por correo.
 | Build | **Vite** + **React 19** + **TypeScript** (`strict: true`) | Rápido, estándar, fácil de mantener |
 | Rutas | **react-router** v7 (modo librería, `createBrowserRouter`) | Simple |
 | Estado | **Zustand** (un store) sobre un `InventoryRepository` | Mínimo boilerplate; repos intercambiables |
-| Estilos | **CSS Modules** + variables CSS (tokens) en `src/styles/tokens.css` | Sin dependencias de UI; control total del look Apple |
+| Estilos | **Tailwind CSS v4** (`tailwindcss` + `@tailwindcss/vite`, dev) con los tokens de `src/styles/tokens.css` en `@theme static` | Decisión del usuario (reemplaza CSS Modules). Una sola fuente de verdad; paleta/escalas por defecto desactivadas |
 | Íconos | **lucide-react** | Trazos finos similares a SF Symbols; tree-shakeable |
 | Fechas | Utilidades propias en `src/domain/dates.ts` sobre strings `YYYY-MM-DD` | Evitar errores de zona horaria (ver §6.6) |
 | IDs | `crypto.randomUUID()` | Nativo |
@@ -641,7 +641,7 @@ claro/oscuro, ancho 375 px y 1280 px, y navegación solo con teclado.
   escapar comillas) + tests.
 
 ### Fase 3 — Kit de UI (estilo Apple)
-Cargar la skill `apple-design` antes de empezar. Cada componente: CSS Module, props tipadas,
+Cargar la skill `apple-design` antes de empezar. Cada componente: utilidades Tailwind (sin CSS Modules), props tipadas,
 accesible (roles/aria correctos), sin lógica de negocio, con un test de render/interacción básico.
 - [ ] **T3.1** `Button` (variantes: `filled`, `tinted`, `plain`, `destructive`; tamaños; ícono
   opcional; estado `loading`), `Badge` (tonos de §8.2, con ícono + texto), `Stat`, `Card`.
@@ -730,4 +730,5 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 | 2026-11-13 | Mín/máx por defecto = 1 y 3 meses de consumo | Coincide con los valores del Cardex 2024 |
 | 2026-11-13 | Cobertura sin consumo = `null` ("—"), nunca división por cero | Corrige `#DIV/0!` del Excel |
 | 2026-11-13 | Gestor de paquetes: pnpm; los scripts usan `pnpm run` y los comandos `npm run …` de este plan se leen como `pnpm run …` | Decisión del usuario |
+| 2026-11-13 | Tailwind v4 reemplaza CSS Modules; `tokens.css` pasa a `@theme static` y se desactivan `--color-*`, `--text-*`, `--radius-*`, `--font-*` por defecto | Decisión del usuario; los tokens siguen siendo la única fuente de verdad (claro/oscuro por variables) |
 | 2026-11-13 | Tarjeta de Urea renumerada a LRC-07-24 en el seed | El original duplica LRC-06-24 |
