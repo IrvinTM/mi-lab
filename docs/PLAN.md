@@ -611,7 +611,7 @@ claro/oscuro, ancho 375 px y 1280 px, y navegación solo con teclado.
 - [x] **T0.2** `styles/tokens.css` (§8.2) y `styles/global.css` (reset mínimo, `body` con
   `--font-sans`, `--color-bg-grouped`, `-webkit-font-smoothing: antialiased`, `:focus-visible`,
   `prefers-reduced-motion`). *Hecho cuando*: la página cambia a oscuro con el sistema.
-- [ ] **T0.3** Agregar `.gitignore` (node_modules, dist, coverage) y actualizar README con
+- [x] **T0.3** Agregar `.gitignore` (node_modules, dist, coverage) y actualizar README con
   instrucciones (`npm i`, `npm run dev`, `npm run check`).
 
 ### Fase 1 — Dominio (sin UI, 100 % testeado)
