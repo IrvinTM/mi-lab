@@ -615,7 +615,7 @@ claro/oscuro, ancho 375 px y 1280 px, y navegación solo con teclado.
   instrucciones (`npm i`, `npm run dev`, `npm run check`).
 
 ### Fase 1 — Dominio (sin UI, 100 % testeado)
-- [ ] **T1.1** `types.ts` + `dates.ts` + tests (incluye caso de zona horaria: `daysUntil` entre
+- [x] **T1.1** `types.ts` + `dates.ts` + tests (incluye caso de zona horaria: `daysUntil` entre
   `2026-11-13` y `2026-11-14` = 1; `addDays('2026-02-28', 1)` = `2026-03-01`).
 - [ ] **T1.2** `stock.ts` + tests (§6.2).
 - [ ] **T1.3** `fefo.ts` + tests (§6.3, todos los casos listados).
@@ -731,4 +731,5 @@ accesible (roles/aria correctos), sin lógica de negocio, con un test de render/
 | 2026-11-13 | Cobertura sin consumo = `null` ("—"), nunca división por cero | Corrige `#DIV/0!` del Excel |
 | 2026-11-13 | Gestor de paquetes: pnpm; los scripts usan `pnpm run` y los comandos `npm run …` de este plan se leen como `pnpm run …` | Decisión del usuario |
 | 2026-11-13 | Tailwind v4 reemplaza CSS Modules; `tokens.css` pasa a `@theme static` y se desactivan `--color-*`, `--text-*`, `--radius-*`, `--font-*` por defecto | Decisión del usuario; los tokens siguen siendo la única fuente de verdad (claro/oscuro por variables) |
+| 2026-11-13 | `todayISO(now: Date)` recibe el reloj como parámetro (el plan lo listaba sin argumentos); solo `state/today.ts` lee el reloj real. `daysUntil(date, today)` = días desde `today` hasta `date` (positivo si es futuro), como en §6.4/§6.5. `monthsBetween(a, b)` = meses calendario completos de a a b (negativo si b < a) | Mantener `domain/` puro; unificar el orden de argumentos de §6.4 y §6.6 |
 | 2026-11-13 | Tarjeta de Urea renumerada a LRC-07-24 en el seed | El original duplica LRC-06-24 |
