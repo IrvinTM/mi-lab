@@ -81,6 +81,13 @@ describe('LocalStorageRepository specifics', () => {
     );
   });
 
+  it('readRaw returns the stored text even when it cannot be loaded', async () => {
+    const repository = new LocalStorageRepository(window.localStorage);
+    expect(await repository.readRaw()).toBeNull();
+    window.localStorage.setItem(STORAGE_KEY, '{not json');
+    expect(await repository.readRaw()).toBe('{not json');
+  });
+
   it('turns a full storage into a RepositoryError on save', async () => {
     const full = {
       getItem: () => null,

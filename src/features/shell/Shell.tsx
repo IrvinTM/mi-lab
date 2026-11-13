@@ -10,8 +10,10 @@ import {
 import { useEffect, useState } from 'react';
 import { Link, Outlet } from 'react-router';
 import { formatDate } from '@/lib/format';
+import { useToday } from '@/state/selectors';
 import { useInventoryStore } from '@/state/store';
 import { AppShell, Alert, Badge, Button, EmptyState, ToastProvider, type NavItem } from '@/ui';
+import { downloadText } from '../shared/download';
 import { RouteAnnouncer } from './RouteAnnouncer';
 import { useGlobalShortcuts } from './useGlobalShortcuts';
 
@@ -25,15 +27,26 @@ const SETTINGS_ITEM: NavItem = { to: '/ajustes', label: 'Ajustes', icon: Setting
 
 function LoadError({ message }: { message?: string }) {
   const [confirming, setConfirming] = useState(false);
+  const today = useToday();
+  // Keep a copy of the unreadable data before resetting: it can still be repaired by hand.
+  const downloadStored = async () => {
+    const text = await useInventoryStore.getState().readStoredText();
+    if (text !== null) downloadText(text, `mi-lab-datos-guardados-${today}.json`);
+  };
   return (
     <main className="mx-auto max-w-lg px-4 py-16">
       <EmptyState
         icon={TriangleAlert}
         title="No se pudieron leer los datos"
         action={
-          <Button variant="destructive" onClick={() => setConfirming(true)}>
-            Restablecer datos demo
-          </Button>
+          <div className="flex flex-col items-center gap-3">
+            <Button variant="tinted" onClick={() => void downloadStored()}>
+              Descargar datos guardados
+            </Button>
+            <Button variant="destructive" onClick={() => setConfirming(true)}>
+              Restablecer datos demo
+            </Button>
+          </div>
         }
       >
         {message ?? 'Los datos guardados en este navegador no se pueden leer.'} No se ha modificado
@@ -43,7 +56,7 @@ function LoadError({ message }: { message?: string }) {
         open={confirming}
         destructive
         title="¿Restablecer los datos?"
-        message="Se reemplazarán los datos guardados en este navegador por los datos de demostración."
+        message="Se reemplazarán los datos guardados en este navegador por los datos de demostración. Si quieres conservarlos, descárgalos antes."
         confirmLabel="Restablecer"
         onCancel={() => setConfirming(false)}
         onConfirm={() => {

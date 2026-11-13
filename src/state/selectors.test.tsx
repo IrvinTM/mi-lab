@@ -29,6 +29,35 @@ describe('useToday', () => {
     act(() => useInventoryStore.getState().updateSettings({ todayOverride: '2026-12-25' }));
     expect(result.current).toBe('2026-12-25');
   });
+
+  it('moves to the next day at midnight while the app stays open', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      vi.setSystemTime(new Date(2026, 10, 13, 23, 59, 0));
+      act(() => useInventoryStore.getState().updateSettings({ todayOverride: undefined }));
+      const { result } = renderHook(() => useToday());
+      expect(result.current).toBe('2026-11-13');
+      act(() => vi.advanceTimersByTime(2 * 60_000));
+      expect(result.current).toBe('2026-11-14');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rechecks the date when the page becomes visible again (after sleep)', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date(2026, 10, 13, 18, 0, 0));
+      act(() => useInventoryStore.getState().updateSettings({ todayOverride: undefined }));
+      const { result } = renderHook(() => useToday());
+      expect(result.current).toBe('2026-11-13');
+      vi.setSystemTime(new Date(2026, 10, 14, 8, 0, 0)); // the computer slept overnight
+      act(() => document.dispatchEvent(new Event('visibilitychange')));
+      expect(result.current).toBe('2026-11-14');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('selector hooks', () => {

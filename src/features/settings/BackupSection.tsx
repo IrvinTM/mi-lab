@@ -3,6 +3,7 @@ import { backupFileError, checkBackup } from '@/state/backup';
 import { useToday } from '@/state/selectors';
 import { useInventoryStore } from '@/state/store';
 import { Alert, Button, useToast } from '@/ui';
+import { downloadText } from '../shared/download';
 import { SettingsSection } from './SettingsSection';
 
 function readText(file: File): Promise<string> {
@@ -27,16 +28,7 @@ export function BackupSection() {
 
   const download = () => {
     const { data } = useInventoryStore.getState();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `mi-lab-respaldo-${today}.json`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    // Revoke after the click has been handled: some browsers cancel the download otherwise.
-    setTimeout(() => URL.revokeObjectURL(url), 0);
+    downloadText(JSON.stringify(data, null, 2), `mi-lab-respaldo-${today}.json`);
     setError(undefined);
     toast.show({ message: 'Respaldo descargado' });
   };

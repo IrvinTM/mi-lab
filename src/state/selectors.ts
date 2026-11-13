@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
+import { isValidISODate, todayISO } from '@/domain/dates';
 import type { LedgerRange, LedgerRow } from '@/domain/ledger';
 import type { ISODate } from '@/domain/types';
 import {
@@ -12,13 +13,18 @@ import {
   type ProductRow,
 } from './derive';
 import { useInventoryStore } from './store';
-import { currentToday } from './today';
+import { subscribeToDayChange } from './today';
 
-/** "Today" for the UI: the simulated date from the settings, or the local calendar date. */
+const clockDay = (): ISODate => todayISO(new Date());
+
+/**
+ * "Today" for the UI: the simulated date from the settings, or the local calendar date. The
+ * clock date follows midnight while the app stays open (a lab may leave it open overnight).
+ */
 export function useToday(): ISODate {
   const todayOverride = useInventoryStore((state) => state.data.settings.todayOverride);
-  // The clock is read only when the override changes, not on every render.
-  return useMemo(() => currentToday({ todayOverride }), [todayOverride]);
+  const today = useSyncExternalStore(subscribeToDayChange, clockDay);
+  return todayOverride && isValidISODate(todayOverride) ? todayOverride : today;
 }
 
 export function useProductRows(): ProductRow[] {

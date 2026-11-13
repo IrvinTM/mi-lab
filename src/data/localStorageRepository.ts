@@ -37,6 +37,10 @@ export class LocalStorageRepository implements InventoryRepository {
     }
   }
 
+  async readRaw(): Promise<string | null> {
+    return this.storage.getItem(this.key);
+  }
+
   async clear(): Promise<void> {
     this.storage.removeItem(this.key);
   }

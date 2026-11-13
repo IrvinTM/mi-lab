@@ -10,6 +10,12 @@ export interface InventoryRepository {
   load(): Promise<InventoryData | null>;
   save(data: InventoryData): Promise<void>;
   clear(): Promise<void>;
+  /**
+   * The stored data exactly as saved, without validating it, or null if there is none. Lets the
+   * user keep a copy of data that `load()` rejected before resetting it. Optional: a remote
+   * repository may not offer it.
+   */
+  readRaw?(): Promise<string | null>;
 }
 
 export class RepositoryError extends Error {

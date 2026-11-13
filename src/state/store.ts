@@ -59,6 +59,8 @@ export interface InventoryState {
   data: InventoryData;
 
   init(): Promise<void>;
+  /** The stored data as saved (even if unreadable), to download it before a reset. */
+  readStoredText(): Promise<string | null>;
   /** Writes pending changes now (also used before the page unloads). */
   flush(): Promise<void>;
   receive(input: ReceiveInput): ActionResult<{ movementIds: string[]; lotId: string }>;
@@ -175,6 +177,10 @@ export function createInventoryStore(repository: InventoryRepository, options: S
           }
         })();
         return initPromise;
+      },
+
+      async readStoredText() {
+        return (await repository.readRaw?.()) ?? null;
       },
 
       async flush() {

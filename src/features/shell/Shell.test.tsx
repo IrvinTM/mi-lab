@@ -34,7 +34,9 @@ describe('Shell', () => {
       within(alert).getByRole('link', { name: 'Descarga un respaldo en Ajustes' }),
     ).toHaveAttribute('href', '/ajustes');
     setStore({ saveError: undefined });
-    expect(screen.queryByText(/almacenamiento del navegador está lleno/)).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByText(/almacenamiento del navegador está lleno/)).not.toBeInTheDocument(),
+    );
   });
 
   it('draws the frame with the lab name and the sections', async () => {
@@ -92,6 +94,34 @@ describe('Shell', () => {
     await user.click(await screen.findByRole('button', { name: 'Restablecer' }));
     await waitFor(() => expect(useInventoryStore.getState().status).toBe('ready'));
     expect(useInventoryStore.getState().data.products.length).toBeGreaterThan(100);
+  });
+});
+
+describe('Shell load error', () => {
+  it('downloads the stored data as saved before resetting', async () => {
+    window.localStorage.setItem('mi-lab:inventory:v1', '{"version":1,"areas":"roto"}');
+    let saved: Blob | undefined;
+    const createObjectURL = vi.fn((blob: Blob) => {
+      saved = blob;
+      return 'blob:datos';
+    });
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      setStore({
+        status: 'error',
+        loadError: 'Los datos guardados en este navegador no se pueden leer.',
+      });
+      const user = userEvent.setup();
+      renderApp('/');
+      await user.click(await screen.findByRole('button', { name: 'Descargar datos guardados' }));
+      await waitFor(() => expect(click).toHaveBeenCalledOnce());
+      expect(await saved!.text()).toBe('{"version":1,"areas":"roto"}');
+      expect(useInventoryStore.getState().status).toBe('error');
+    } finally {
+      click.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 });
 
