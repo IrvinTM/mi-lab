@@ -74,9 +74,9 @@ export function BackupSection() {
     toast.show({ message: 'Respaldo restaurado' });
   };
 
-  const reset = () => {
+  const reset = async () => {
     setConfirming(null);
-    useInventoryStore.getState().resetToSeed();
+    await useInventoryStore.getState().resetToSeed();
     setError(undefined);
     toast.show({ message: 'Datos demo restablecidos' });
   };
@@ -147,7 +147,7 @@ export function BackupSection() {
         message="Se borrarán todos los productos, lotes y movimientos actuales y se cargará el inventario de ejemplo. No se puede deshacer."
         confirmLabel="Restablecer"
         onCancel={cancel}
-        onConfirm={reset}
+        onConfirm={() => void reset()}
       />
     </SettingsSection>
   );

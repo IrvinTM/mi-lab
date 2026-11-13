@@ -1,5 +1,5 @@
 import { Printer, TriangleAlert } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { LedgerEntry, LedgerRow } from '@/domain/ledger';
 import type { FundingSource } from '@/domain/types';
 import { EMPTY, formatCoverage, formatCurrency, formatDate, formatNumber } from '@/lib/format';
@@ -40,64 +40,77 @@ export function LedgerSection({
   const filtered = from !== '' || to !== '';
   const invertedRange = from !== '' && to !== '' && from > to;
 
-  const columns: TableColumn<LedgerRow>[] = [
-    {
-      key: 'date',
-      header: 'Fecha',
-      className: 'whitespace-nowrap',
-      cell: (entry) => formatDate(entry.date),
-    },
-    {
-      key: 'concept',
-      header: 'Concepto',
-      className: 'min-w-40',
-      cell: (entry) => (
-        <span className="flex flex-col gap-1">
-          <span>{entry.concept}</span>
-          {entry.fefoOverrideReason ? (
-            <span className="flex items-start gap-1 text-footnote text-label-secondary">
-              <TriangleAlert aria-hidden="true" size={14} className="mt-0.5 shrink-0 text-label" />
-              <span>Fuera de orden FEFO: {entry.fefoOverrideReason}</span>
-            </span>
-          ) : null}
-        </span>
-      ),
-    },
-    {
-      key: 'source',
-      header: 'Procedencia',
-      className: 'whitespace-nowrap',
-      cell: (entry) => sourceName(fundingSources, entry.sourceCode),
-    },
-    {
-      key: 'lot',
-      header: 'N.º de lote',
-      className: 'whitespace-nowrap',
-      cell: (entry) => entry.lotNumber || EMPTY,
-    },
-    {
-      key: 'expiry',
-      header: 'Vencimiento',
-      className: 'whitespace-nowrap',
-      cell: (entry) => formatDate(entry.expiryDate),
-    },
-    { key: 'entry', header: 'Entrada', numeric: true, cell: (entry) => quantityCell(entry.entry) },
-    { key: 'exit', header: 'Salida', numeric: true, cell: (entry) => quantityCell(entry.exit) },
-    {
-      key: 'balance',
-      header: 'Saldo',
-      numeric: true,
-      className: 'font-semibold',
-      cell: (entry) => formatNumber(entry.balance),
-    },
-    {
-      key: 'coverage',
-      header: 'Cobertura',
-      numeric: true,
-      className: 'whitespace-nowrap',
-      cell: (entry) => formatCoverage(entry.coverageMonths),
-    },
-  ];
+  // Stable between renders so the memoized table rows are not all re-rendered by the date fields.
+  const columns = useMemo(
+    (): TableColumn<LedgerRow>[] => [
+      {
+        key: 'date',
+        header: 'Fecha',
+        className: 'whitespace-nowrap',
+        cell: (entry) => formatDate(entry.date),
+      },
+      {
+        key: 'concept',
+        header: 'Concepto',
+        className: 'min-w-40',
+        cell: (entry) => (
+          <span className="flex flex-col gap-1">
+            <span>{entry.concept}</span>
+            {entry.fefoOverrideReason ? (
+              <span className="flex items-start gap-1 text-footnote text-label-secondary">
+                <TriangleAlert
+                  aria-hidden="true"
+                  size={14}
+                  className="mt-0.5 shrink-0 text-label"
+                />
+                <span>Fuera de orden FEFO: {entry.fefoOverrideReason}</span>
+              </span>
+            ) : null}
+          </span>
+        ),
+      },
+      {
+        key: 'source',
+        header: 'Procedencia',
+        className: 'whitespace-nowrap',
+        cell: (entry) => sourceName(fundingSources, entry.sourceCode),
+      },
+      {
+        key: 'lot',
+        header: 'N.º de lote',
+        className: 'whitespace-nowrap',
+        cell: (entry) => entry.lotNumber || EMPTY,
+      },
+      {
+        key: 'expiry',
+        header: 'Vencimiento',
+        className: 'whitespace-nowrap',
+        cell: (entry) => formatDate(entry.expiryDate),
+      },
+      {
+        key: 'entry',
+        header: 'Entrada',
+        numeric: true,
+        cell: (entry) => quantityCell(entry.entry),
+      },
+      { key: 'exit', header: 'Salida', numeric: true, cell: (entry) => quantityCell(entry.exit) },
+      {
+        key: 'balance',
+        header: 'Saldo',
+        numeric: true,
+        className: 'font-semibold',
+        cell: (entry) => formatNumber(entry.balance),
+      },
+      {
+        key: 'coverage',
+        header: 'Cobertura',
+        numeric: true,
+        className: 'whitespace-nowrap',
+        cell: (entry) => formatCoverage(entry.coverageMonths),
+      },
+    ],
+    [fundingSources],
+  );
 
   return (
     <section aria-labelledby="ledger-heading" className="flex flex-col gap-3">

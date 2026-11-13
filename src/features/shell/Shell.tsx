@@ -47,7 +47,7 @@ function LoadError({ message }: { message?: string }) {
         onCancel={() => setConfirming(false)}
         onConfirm={() => {
           setConfirming(false);
-          useInventoryStore.getState().resetToSeed();
+          void useInventoryStore.getState().resetToSeed();
         }}
       />
     </main>

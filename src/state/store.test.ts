@@ -502,7 +502,7 @@ describe('catalog, settings and backups', () => {
 
   it('resetToSeed replaces the data with the demo data and persists it', async () => {
     const { store, repository } = await readyStore();
-    store.getState().resetToSeed();
+    await store.getState().resetToSeed();
     expect(store.getState().data.products.length).toBeGreaterThan(100);
     expect(store.getState().data.settings.todayOverride).toBeUndefined();
     await store.getState().flush();

@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { buildSeed } from '@/data/seed/buildSeed';
 import { useInventoryStore } from '@/state/store';
+import type { InventoryData } from '@/domain/types';
 import { sampleData } from '@/test/fixtures';
+import { largeData } from '@/test/largeData';
 import { ProductsPage } from './ProductsPage';
 
 const TODAY = '2026-11-13';
@@ -13,7 +15,7 @@ function seedData() {
   return { ...data, settings: { ...data.settings, todayOverride: TODAY } };
 }
 
-function setData(data: ReturnType<typeof seedData>) {
+function setData(data: InventoryData) {
   act(() => useInventoryStore.setState({ status: 'ready', data }));
 }
 
@@ -227,3 +229,22 @@ describe('ProductsPage (mobile)', () => {
     expect(screen.getByText('Detalle /productos/p001')).toBeInTheDocument();
   });
 });
+
+describe('ProductsPage (1,000 products)', () => {
+  it('mounts every row and filters them while typing', async () => {
+    const data = largeData({ products: 1_000, today: TODAY });
+    setData(data);
+    const start = performance.now();
+    renderPage();
+    const mountMs = performance.now() - start;
+    const table = screen.getByRole('table', { name: 'Productos' });
+    expect(within(table).getAllByRole('row')).toHaveLength(1_001);
+    // Generous budget for slow CI machines: it guards against O(n²) regressions, not jsdom speed.
+    expect(mountMs).toBeLessThan(10_000);
+
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar productos' }), '0999');
+    expect(await screen.findByText('1 producto')).toBeInTheDocument();
+    expect(within(table).getAllByRole('row')).toHaveLength(2);
+  });
+});
+

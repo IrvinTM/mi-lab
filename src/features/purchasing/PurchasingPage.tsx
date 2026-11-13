@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react';
 import { ShoppingCart } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 import { EMPTY, formatCoverage, formatNumber, formatQuantity, formatStock } from '@/lib/format';
@@ -6,7 +7,7 @@ import type { ProductRow } from '@/state/derive';
 import { EmptyState, List, ListRow, PageHeader, Stat, Table, type TableColumn } from '@/ui';
 import { PageActions } from '../shared/PageActions';
 import { ReorderBadge } from '../shared/StatusBadges';
-import { useMediaQuery } from './useMediaQuery';
+import { useMediaQuery } from '../shared/useMediaQuery';
 
 const productPath = (row: ProductRow) => `/productos/${encodeURIComponent(row.product.id)}`;
 
@@ -90,6 +91,11 @@ function unknownColumns(): TableColumn<ProductRow>[] {
   );
 }
 
+// Built once: stable columns let the memoized table rows skip re-rendering.
+const BUY_COLUMNS = buildColumns();
+const CONFIGURE_COLUMNS = unknownColumns();
+const getRowKey = (row: ProductRow) => row.product.id;
+
 function MobileRows({ rows, header }: { rows: ProductRow[]; header: string }) {
   const navigate = useNavigate();
   return (
@@ -138,10 +144,11 @@ function Section({
   title: string;
   description?: string;
   rows: ProductRow[];
-  columns: TableColumn<ProductRow>[];
+  columns: readonly TableColumn<ProductRow>[];
   wide: boolean;
 }) {
   const navigate = useNavigate();
+  const open = useCallback((row: ProductRow) => void navigate(productPath(row)), [navigate]);
   if (rows.length === 0) return null;
   return (
     <section aria-label={title} className="mt-8 first:mt-0">
@@ -155,8 +162,8 @@ function Section({
             caption={title}
             columns={columns}
             rows={rows}
-            getRowKey={(row) => row.product.id}
-            onRowClick={(row) => void navigate(productPath(row))}
+            getRowKey={getRowKey}
+            onRowClick={open}
           />
         </>
       ) : (
@@ -173,13 +180,18 @@ function Section({
 
 export function PurchasingPage() {
   const rows = usePurchaseList();
-  const wide = useMediaQuery('(min-width: 900px)');
+  const wide = useMediaQuery('(min-width: 900px)', false);
 
-  const toBuy = rows.filter(
-    (row) => row.reorder.status === 'out' || row.reorder.status === 'reorder',
-  );
-  const toConfigure = rows.filter((row) => row.reorder.status === 'unknown');
-  const outCount = toBuy.filter((row) => row.reorder.status === 'out').length;
+  const { toBuy, toConfigure, outCount } = useMemo(() => {
+    const buy = rows.filter(
+      (row) => row.reorder.status === 'out' || row.reorder.status === 'reorder',
+    );
+    return {
+      toBuy: buy,
+      toConfigure: rows.filter((row) => row.reorder.status === 'unknown'),
+      outCount: buy.filter((row) => row.reorder.status === 'out').length,
+    };
+  }, [rows]);
 
   return (
     <>
@@ -206,12 +218,12 @@ export function PurchasingPage() {
               detail="Sin consumo ni mínimo definidos"
             />
           </div>
-          <Section title="Comprar" rows={toBuy} columns={buildColumns()} wide={wide} />
+          <Section title="Comprar" rows={toBuy} columns={BUY_COLUMNS} wide={wide} />
           <Section
             title="Configura el consumo"
             description="Define el consumo promedio o el mínimo de cada producto para que se calcule cuánto comprar."
             rows={toConfigure}
-            columns={unknownColumns()}
+            columns={CONFIGURE_COLUMNS}
             wide={wide}
           />
         </>

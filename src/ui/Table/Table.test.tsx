@@ -235,4 +235,44 @@ describe('Table', () => {
       expect(screen.queryByRole('region')).not.toBeInTheDocument();
     });
   });
+
+  it('memoizes rows: re-rendering with the same rows and columns does not render the cells again', () => {
+    const cell = vi.fn((p: Product) => p.name);
+    const memoColumns: TableColumn<Product>[] = [{ key: 'name', header: 'Producto', cell }];
+    const onRowClick = vi.fn();
+    const { rerender } = render(
+      <Table
+        caption="Productos"
+        columns={memoColumns}
+        rows={products}
+        getRowKey={(p) => p.id}
+        onRowClick={onRowClick}
+      />,
+    );
+    expect(cell).toHaveBeenCalledTimes(2);
+
+    rerender(
+      <Table
+        caption="Productos"
+        columns={memoColumns}
+        rows={products}
+        getRowKey={(p) => p.id}
+        onRowClick={onRowClick}
+      />,
+    );
+    expect(cell).toHaveBeenCalledTimes(2);
+
+    // Only the changed row renders again.
+    rerender(
+      <Table
+        caption="Productos"
+        columns={memoColumns}
+        rows={[products[0]!, { ...products[1]!, name: 'Urea BUN' }]}
+        getRowKey={(p) => p.id}
+        onRowClick={onRowClick}
+      />,
+    );
+    expect(cell).toHaveBeenCalledTimes(3);
+    expect(screen.getByRole('cell', { name: 'Urea BUN' })).toBeInTheDocument();
+  });
 });

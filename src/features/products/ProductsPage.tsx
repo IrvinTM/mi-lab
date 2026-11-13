@@ -1,4 +1,4 @@
-import { memo, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { PackageSearch } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router';
 import { EMPTY, formatCoverage, formatDate, formatStock } from '@/lib/format';
@@ -27,7 +27,7 @@ import {
   sortRows,
   type StatusFilter,
 } from './filterProducts';
-import { useMediaQuery } from './useMediaQuery';
+import { useMediaQuery } from '../shared/useMediaQuery';
 
 const SEARCH_ID = 'products-search';
 /** A segmented control only fits a handful of options; beyond that the area filter is a Select. */
@@ -106,8 +106,11 @@ interface ResultsProps {
 /** Memoized so typing in the toolbar does not re-render rows that did not change. */
 const Results = memo(function Results({ rows, sort, onSortChange, desktop }: ResultsProps) {
   const navigate = useNavigate();
-  const open = (row: ProductRow) =>
-    void navigate(`/productos/${encodeURIComponent(row.product.id)}`);
+  // Stable, so the memoized table rows only re-render when their own row changes.
+  const open = useCallback(
+    (row: ProductRow) => void navigate(`/productos/${encodeURIComponent(row.product.id)}`),
+    [navigate],
+  );
 
   if (desktop) {
     return (

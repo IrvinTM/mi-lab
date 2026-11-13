@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { DEFAULT_SETTINGS, migrate } from '@/data/migrate';
 import { LocalStorageRepository } from '@/data/localStorageRepository';
 import type { InventoryRepository } from '@/data/repository';
-import { buildSeed } from '@/data/seed/buildSeed';
 import { todayISO } from '@/domain/dates';
 import { allocateFefo, firstFefoLot } from '@/domain/fefo';
 import { lotBalance, lotBalances, productStock } from '@/domain/stock';
@@ -73,7 +72,8 @@ export interface InventoryState {
   /** Only areas without products (archived ones included) can be removed. */
   removeArea(id: string): ActionResult;
   updateSettings(patch: Partial<Settings>): void;
-  resetToSeed(): void;
+  /** Async: the demo data is its own chunk, downloaded only when needed. */
+  resetToSeed(): Promise<void>;
   importBackup(json: unknown): { ok: boolean; error?: string };
 }
 
@@ -82,6 +82,12 @@ export interface StoreOptions {
   now?: () => Date;
   /** Milliseconds to wait after the last change before saving. Default 300. */
   debounceMs?: number;
+}
+
+/** The demo data is only needed on the first visit or on reset, so it stays out of the initial bundle. */
+async function loadSeed(today: ISODate): Promise<InventoryData> {
+  const { buildSeed } = await import('@/data/seed/buildSeed');
+  return buildSeed(today);
 }
 
 function emptyData(): InventoryData {
@@ -163,7 +169,7 @@ export function createInventoryStore(repository: InventoryRepository, options: S
             if (stored) {
               set({ data: stored, status: 'ready' });
             } else {
-              set({ data: buildSeed(todayISO(now())), status: 'ready' });
+              set({ data: await loadSeed(todayISO(now())), status: 'ready' });
               scheduleSave();
             }
           } catch (error) {
@@ -409,8 +415,8 @@ export function createInventoryStore(repository: InventoryRepository, options: S
         setData({ ...data, settings: { ...data.settings, ...patch } });
       },
 
-      resetToSeed() {
-        replaceAll(buildSeed(todayISO(now())));
+      async resetToSeed() {
+        replaceAll(await loadSeed(todayISO(now())));
       },
 
       importBackup(json) {

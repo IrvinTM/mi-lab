@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { formatQuantity } from '@/lib/format';
 import { useInventoryStore } from '@/state/store';
 import { Alert, useToast } from '@/ui';
@@ -44,11 +44,14 @@ export function useWriteOff(): {
     });
   };
 
+  // Stable, so memoized rows that receive it do not re-render with the page.
+  const requestWriteOff = useCallback((next: WriteOffTarget) => {
+    setTarget(next);
+    setOpen(true);
+  }, []);
+
   return {
-    requestWriteOff: (next) => {
-      setTarget(next);
-      setOpen(true);
-    },
+    requestWriteOff,
     dialog: (
       <Alert
         open={open}

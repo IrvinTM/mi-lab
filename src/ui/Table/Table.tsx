@@ -1,4 +1,5 @@
 import {
+  memo,
   useEffect,
   useRef,
   useState,
@@ -54,6 +55,12 @@ const justifyClass = {
 
 const INTERACTIVE = 'a,button,input,select,textarea,summary,[role="button"],[role="link"]';
 
+// Ignore events that come from controls inside a cell (links, buttons…): they handle themselves.
+function fromNestedControl(event: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>): boolean {
+  const control = (event.target as HTMLElement).closest(INTERACTIVE);
+  return control !== null && control !== event.currentTarget;
+}
+
 function resolveAlign<Row>(column: TableColumn<Row>) {
   return column.align ?? (column.numeric ? 'end' : 'start');
 }
@@ -92,12 +99,6 @@ export function Table<Row>({
     const direction: SortDirection =
       sort?.key === column.key && sort.direction === 'ascending' ? 'descending' : 'ascending';
     onSortChange?.({ key: column.key, direction });
-  };
-
-  // Ignore events that come from controls inside a cell (links, buttons…): they handle themselves.
-  const fromNestedControl = (event: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>) => {
-    const control = (event.target as HTMLElement).closest(INTERACTIVE);
-    return control !== null && control !== event.currentTarget;
   };
 
   return (
@@ -162,52 +163,65 @@ export function Table<Row>({
             </tr>
           ) : null}
           {rows.map((row) => (
-            <tr
-              key={getRowKey(row)}
-              tabIndex={onRowClick ? 0 : undefined}
-              onClick={
-                onRowClick
-                  ? (event) => {
-                      if (!fromNestedControl(event)) onRowClick(row);
-                    }
-                  : undefined
-              }
-              onKeyDown={
-                onRowClick
-                  ? (event) => {
-                      if (
-                        (event.key === 'Enter' || event.key === ' ') &&
-                        !fromNestedControl(event)
-                      ) {
-                        event.preventDefault();
-                        onRowClick(row);
-                      }
-                    }
-                  : undefined
-              }
-              className={`border-t border-separator ${
-                onRowClick
-                  ? 'cursor-pointer transition-colors duration-150 hover:bg-fill focus-visible:bg-fill -outline-offset-3'
-                  : ''
-              }`}
-            >
-              {columns.map((column) => {
-                const align = resolveAlign(column);
-                return (
-                  <td
-                    key={column.key}
-                    className={`px-4 py-3 align-middle ${alignClass[align]} ${
-                      column.numeric ? 'tabular-nums' : ''
-                    } ${column.className ?? ''}`}
-                  >
-                    {column.cell(row)}
-                  </td>
-                );
-              })}
-            </tr>
+            <TableRow key={getRowKey(row)} row={row} columns={columns} onRowClick={onRowClick} />
           ))}
         </tbody>
       </table>
     </div>
   );
 }
+
+interface TableRowProps<Row> {
+  row: Row;
+  columns: readonly TableColumn<Row>[];
+  onRowClick?: (row: Row) => void;
+}
+
+/**
+ * Memoized: re-sorting, filtering or re-rendering the page only renders rows whose `row`,
+ * `columns` or `onRowClick` changed. Keep `columns` and `onRowClick` stable (module constant,
+ * `useMemo`, `useCallback`) to benefit.
+ */
+const TableRow = memo(function TableRow<Row>({ row, columns, onRowClick }: TableRowProps<Row>) {
+  return (
+    <tr
+      tabIndex={onRowClick ? 0 : undefined}
+      onClick={
+        onRowClick
+          ? (event) => {
+              if (!fromNestedControl(event)) onRowClick(row);
+            }
+          : undefined
+      }
+      onKeyDown={
+        onRowClick
+          ? (event) => {
+              if ((event.key === 'Enter' || event.key === ' ') && !fromNestedControl(event)) {
+                event.preventDefault();
+                onRowClick(row);
+              }
+            }
+          : undefined
+      }
+      className={`border-t border-separator ${
+        onRowClick
+          ? 'cursor-pointer transition-colors duration-150 hover:bg-fill focus-visible:bg-fill -outline-offset-3'
+          : ''
+      }`}
+    >
+      {columns.map((column) => {
+        const align = resolveAlign(column);
+        return (
+          <td
+            key={column.key}
+            className={`px-4 py-3 align-middle ${alignClass[align]} ${
+              column.numeric ? 'tabular-nums' : ''
+            } ${column.className ?? ''}`}
+          >
+            {column.cell(row)}
+          </td>
+        );
+      })}
+    </tr>
+  );
+}) as <Row>(props: TableRowProps<Row>) => ReactNode;

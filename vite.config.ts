@@ -12,6 +12,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // `pnpm run perf` runs the timings in scripts/ (slow, not part of `check`).
+    include: process.env.PERF ? ['scripts/**/*.perf.ts'] : ['src/**/*.test.{ts,tsx}'],
     // contrast.test.ts reads tokens.css?raw; Vitest blanks CSS it does not process.
     css: { include: [/tokens\.css/] },
   },
