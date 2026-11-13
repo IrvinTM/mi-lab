@@ -107,3 +107,31 @@ export function formatDateEs(date: ISODate): string {
   const { year, month, day } = splitISO(date);
   return `${day} ${MONTHS_ES[month - 1]} ${year}`;
 }
+
+const YEAR_MONTH_PATTERN = /^(\d{4})-(\d{2})$/;
+
+/** First and last day of a calendar month ('2028-02' → 2028-02-01..2028-02-29). */
+export function monthRange(yearMonth: string): { from: ISODate; to: ISODate } {
+  const match = YEAR_MONTH_PATTERN.exec(yearMonth);
+  const year = match ? Number(match[1]) : 0;
+  const month = match ? Number(match[2]) : 0;
+  if (!match || month < 1 || month > 12) throw new RangeError(`Invalid year-month: "${yearMonth}"`);
+  const from = formatISO({ year, month, day: 1 });
+  const next = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
+  return { from, to: addDays(formatISO({ ...next, day: 1 }), -1) };
+}
+
+/** The month before the one `today` falls in. */
+export function previousMonthRange(today: ISODate): { from: ISODate; to: ISODate } {
+  const { year, month } = splitISO(today);
+  return monthRange(
+    month === 1 ? `${pad(year - 1, 4)}-12` : `${pad(year, 4)}-${pad(month - 1, 2)}`,
+  );
+}
+
+/** From the 1st of `today`'s month up to `today` (never a future date). */
+export function currentMonthRange(today: ISODate): { from: ISODate; to: ISODate } {
+  const { year, month } = splitISO(today);
+  const { from, to } = monthRange(`${pad(year, 4)}-${pad(month, 2)}`);
+  return { from, to: to < today ? to : today };
+}
