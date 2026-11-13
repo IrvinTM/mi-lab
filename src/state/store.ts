@@ -1,0 +1,392 @@
+import { create } from 'zustand';
+import { DEFAULT_SETTINGS, migrate } from '@/data/migrate';
+import { LocalStorageRepository } from '@/data/localStorageRepository';
+import type { InventoryRepository } from '@/data/repository';
+import { buildSeed } from '@/data/seed/buildSeed';
+import { todayISO } from '@/domain/dates';
+import { allocateFefo, firstFefoLot } from '@/domain/fefo';
+import { lotBalance, lotBalances, productStock } from '@/domain/stock';
+import type { InventoryData, ISODate, Movement, Product, Settings } from '@/domain/types';
+import {
+  findExistingLot,
+  isValid,
+  normalizeLotNumber,
+  validateIssue,
+  validateReceipt,
+} from '@/domain/validation';
+import { currentToday } from './today';
+
+export interface ReceiveInput {
+  productId: string;
+  date: ISODate;
+  lotNumber: string;
+  expiryDate: ISODate;
+  /** Base units. */
+  quantity: number;
+  concept?: string;
+  sourceCode?: number;
+  unitPrice?: number;
+}
+
+export interface IssueInput {
+  productId: string;
+  date: ISODate;
+  /** Base units. */
+  quantity: number;
+  concept?: string;
+  /** Only when the user picked a lot by hand. */
+  lotId?: string;
+  fefoOverrideReason?: string;
+}
+
+/** `error` is the first message (for a toast); `errors` is by field (for the form). */
+export interface ActionFailure {
+  ok: false;
+  error: string;
+  errors: Record<string, string>;
+}
+
+export type ActionResult<T extends object = object> = ({ ok: true } & T) | ActionFailure;
+
+export type StoreStatus = 'loading' | 'ready' | 'error';
+
+export interface InventoryState {
+  status: StoreStatus;
+  /** Why loading failed (stored data unreadable) or the last save failed. */
+  loadError?: string;
+  saveError?: string;
+  data: InventoryData;
+
+  init(): Promise<void>;
+  /** Writes pending changes now (also used before the page unloads). */
+  flush(): Promise<void>;
+  receive(input: ReceiveInput): ActionResult<{ movementIds: string[]; lotId: string }>;
+  issue(input: IssueInput): ActionResult<{ movementIds: string[] }>;
+  adjust(lotId: string, delta: number, reason: string): ActionResult<{ movementIds: string[] }>;
+  writeOffExpired(lotId: string): ActionResult<{ movementIds: string[] }>;
+  /** Deletes those movements and the lots left without movements. False if it would leave a negative balance. */
+  undo(movementIds: string[]): boolean;
+  upsertProduct(product: Product): void;
+  updateSettings(patch: Partial<Settings>): void;
+  resetToSeed(): void;
+  importBackup(json: unknown): { ok: boolean; error?: string };
+}
+
+export interface StoreOptions {
+  newId?: () => string;
+  now?: () => Date;
+  /** Milliseconds to wait after the last change before saving. Default 300. */
+  debounceMs?: number;
+}
+
+function emptyData(): InventoryData {
+  return {
+    version: 1,
+    areas: [],
+    fundingSources: [],
+    products: [],
+    lots: [],
+    movements: [],
+    settings: { ...DEFAULT_SETTINGS },
+  };
+}
+
+function failure(errors: Record<string, string>): ActionFailure {
+  return {
+    ok: false,
+    error: Object.values(errors)[0] ?? 'No se pudo completar la acción.',
+    errors,
+  };
+}
+
+export function createInventoryStore(repository: InventoryRepository, options: StoreOptions = {}) {
+  const newId = options.newId ?? (() => crypto.randomUUID());
+  const now = options.now ?? (() => new Date());
+  const debounceMs = options.debounceMs ?? 300;
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let initPromise: Promise<void> | undefined;
+
+  const store = create<InventoryState>()((set, get) => {
+    const today = (data: InventoryData = get().data): ISODate => currentToday(data.settings, now());
+    const setData = (data: InventoryData): void => set({ data });
+    const createdAt = (): string => now().toISOString();
+    /** Replaces everything. Also the way out of a failed load, so it always saves. */
+    const replaceAll = (data: InventoryData): void => {
+      set({ data, status: 'ready', loadError: undefined });
+      scheduleSave();
+    };
+
+    const addMovements = (movements: Movement[], extra: Partial<InventoryData> = {}): void => {
+      const { data } = get();
+      setData({ ...data, ...extra, movements: [...data.movements, ...movements] });
+    };
+
+    return {
+      status: 'loading',
+      data: emptyData(),
+
+      init() {
+        initPromise ??= (async () => {
+          try {
+            const stored = await repository.load();
+            if (stored) {
+              set({ data: stored, status: 'ready' });
+            } else {
+              set({ data: buildSeed(todayISO(now())), status: 'ready' });
+              scheduleSave();
+            }
+          } catch (error) {
+            // Stored data exists but is unreadable: do not save over it.
+            set({
+              status: 'error',
+              loadError:
+                error instanceof Error ? error.message : 'No se pudieron cargar los datos.',
+            });
+          }
+        })();
+        return initPromise;
+      },
+
+      async flush() {
+        if (timer === undefined) return;
+        clearTimeout(timer);
+        timer = undefined;
+        await save();
+      },
+
+      receive(input) {
+        const { data } = get();
+        const check = validateReceipt(input, {
+          today: today(),
+          lots: data.lots,
+          settings: data.settings,
+          productExists: data.products.some((p) => p.id === input.productId),
+        });
+        if (!isValid(check)) return failure(check.errors);
+
+        const lotNumber = normalizeLotNumber(input.lotNumber);
+        let lot = findExistingLot(data.lots, input.productId, lotNumber);
+        let lots = data.lots;
+        if (!lot) {
+          lot = {
+            id: newId(),
+            productId: input.productId,
+            lotNumber,
+            expiryDate: input.expiryDate,
+            receivedDate: input.date,
+            ...(input.sourceCode !== undefined ? { sourceCode: input.sourceCode } : {}),
+            ...(input.unitPrice !== undefined ? { unitPrice: input.unitPrice } : {}),
+          };
+          lots = [...lots, lot];
+        }
+        const movement: Movement = {
+          id: newId(),
+          type: 'receipt',
+          date: input.date,
+          productId: input.productId,
+          lotId: lot.id,
+          quantity: input.quantity,
+          concept: input.concept?.trim() || 'Compra',
+          createdAt: createdAt(),
+          ...(input.unitPrice !== undefined ? { unitPrice: input.unitPrice } : {}),
+          ...(input.sourceCode !== undefined ? { sourceCode: input.sourceCode } : {}),
+        };
+        addMovements([movement], { lots });
+        return { ok: true, movementIds: [movement.id], lotId: lot.id };
+      },
+
+      issue(input) {
+        const { data } = get();
+        const todayDate = today();
+        const product = data.products.find((p) => p.id === input.productId);
+        const stock = productStock(data, input.productId, todayDate);
+        const first = firstFefoLot(stock.lots, todayDate);
+        const selected = input.lotId
+          ? stock.lots.find((entry) => entry.lot.id === input.lotId)
+          : undefined;
+
+        const check = validateIssue(input, {
+          today: todayDate,
+          productExists: product !== undefined,
+          unit: product?.unit ?? 'unidad',
+          usableBalance: stock.usable,
+          firstFefoLot: first
+            ? {
+                id: first.lot.id,
+                lotNumber: first.lot.lotNumber,
+                expiryDate: first.lot.expiryDate,
+              }
+            : null,
+          ...(selected
+            ? {
+                selectedLot: {
+                  id: selected.lot.id,
+                  lotNumber: selected.lot.lotNumber,
+                  expiryDate: selected.lot.expiryDate,
+                  balance: selected.balance,
+                },
+              }
+            : {}),
+        });
+        if (!isValid(check)) return failure(check.errors);
+
+        const allocations = input.lotId
+          ? [{ lotId: input.lotId, quantity: input.quantity }]
+          : (() => {
+              const result = allocateFefo(stock.lots, input.quantity, todayDate);
+              return result.ok ? result.allocations : [];
+            })();
+        if (allocations.length === 0) {
+          return failure({ quantity: 'No hay saldo disponible para esta salida.' });
+        }
+
+        const isOverride = Boolean(input.lotId && first && first.lot.id !== input.lotId);
+        const movements: Movement[] = allocations.map(({ lotId, quantity }) => {
+          const lot = data.lots.find((l) => l.id === lotId)!;
+          return {
+            id: newId(),
+            type: 'issue',
+            date: input.date,
+            productId: input.productId,
+            lotId,
+            quantity,
+            concept: input.concept?.trim() || 'Consumo',
+            createdAt: createdAt(),
+            ...(lot.unitPrice !== undefined ? { unitPrice: lot.unitPrice } : {}),
+            ...(isOverride && input.fefoOverrideReason?.trim()
+              ? { fefoOverrideReason: input.fefoOverrideReason.trim() }
+              : {}),
+          };
+        });
+        addMovements(movements);
+        return { ok: true, movementIds: movements.map((m) => m.id) };
+      },
+
+      adjust(lotId, delta, reason) {
+        const { data } = get();
+        const lot = data.lots.find((l) => l.id === lotId);
+        if (!lot) return failure({ lotId: 'No se encontró el lote.' });
+        const errors: Record<string, string> = {};
+        if (!Number.isInteger(delta) || delta === 0) {
+          errors.quantity = 'El ajuste debe ser un número entero distinto de 0.';
+        } else if (lotBalance(lot, data.movements) + delta < 0) {
+          errors.quantity = 'El ajuste dejaría el saldo del lote en negativo.';
+        }
+        if (!reason.trim()) errors.reason = 'Indica el motivo del ajuste.';
+        if (Object.keys(errors).length > 0) return failure(errors);
+
+        const movement: Movement = {
+          id: newId(),
+          type: 'adjustment',
+          date: today(),
+          productId: lot.productId,
+          lotId,
+          quantity: delta,
+          concept: `Ajuste: ${reason.trim()}`,
+          createdAt: createdAt(),
+        };
+        addMovements([movement]);
+        return { ok: true, movementIds: [movement.id] };
+      },
+
+      writeOffExpired(lotId) {
+        const { data } = get();
+        const lot = data.lots.find((l) => l.id === lotId);
+        if (!lot) return failure({ lotId: 'No se encontró el lote.' });
+        if (lot.expiryDate >= today())
+          return failure({ lotId: 'Este lote todavía no ha vencido.' });
+        const balance = lotBalance(lot, data.movements);
+        if (balance <= 0) return failure({ lotId: 'Este lote no tiene saldo.' });
+
+        const movement: Movement = {
+          id: newId(),
+          type: 'expiry_writeoff',
+          date: today(),
+          productId: lot.productId,
+          lotId,
+          quantity: balance,
+          concept: 'Baja por vencimiento',
+          createdAt: createdAt(),
+          ...(lot.unitPrice !== undefined ? { unitPrice: lot.unitPrice } : {}),
+        };
+        addMovements([movement]);
+        return { ok: true, movementIds: [movement.id] };
+      },
+
+      undo(movementIds) {
+        const { data } = get();
+        const removed = new Set(movementIds);
+        const movements = data.movements.filter((m) => !removed.has(m.id));
+        const withMovements = new Set(movements.map((m) => m.lotId));
+        const lots = data.lots.filter((lot) => withMovements.has(lot.id));
+        const next = { ...data, movements, lots };
+        for (const balance of lotBalances(next).values()) {
+          if (balance < 0) return false;
+        }
+        setData(next);
+        return true;
+      },
+
+      upsertProduct(product) {
+        const { data } = get();
+        const exists = data.products.some((p) => p.id === product.id);
+        setData({
+          ...data,
+          products: exists
+            ? data.products.map((p) => (p.id === product.id ? product : p))
+            : [...data.products, product],
+        });
+      },
+
+      updateSettings(patch) {
+        const { data } = get();
+        setData({ ...data, settings: { ...data.settings, ...patch } });
+      },
+
+      resetToSeed() {
+        replaceAll(buildSeed(todayISO(now())));
+      },
+
+      importBackup(json) {
+        try {
+          replaceAll(migrate(json));
+          return { ok: true };
+        } catch (error) {
+          return {
+            ok: false,
+            error: error instanceof Error ? error.message : 'El respaldo no es válido.',
+          };
+        }
+      },
+    };
+  });
+
+  async function save(): Promise<void> {
+    try {
+      await repository.save(store.getState().data);
+      if (store.getState().saveError) store.setState({ saveError: undefined });
+    } catch (error) {
+      store.setState({
+        saveError: error instanceof Error ? error.message : 'No se pudo guardar.',
+      });
+    }
+  }
+
+  function scheduleSave(): void {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = undefined;
+      void save();
+    }, debounceMs);
+  }
+
+  // Any change to `data` after a successful load is persisted (debounced).
+  store.subscribe((state, previous) => {
+    if (state.data !== previous.data && previous.status === 'ready') scheduleSave();
+  });
+
+  return store;
+}
+
+export const useInventoryStore = createInventoryStore(new LocalStorageRepository());
