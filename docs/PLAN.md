@@ -619,7 +619,7 @@ claro/oscuro, ancho 375 px y 1280 px, y navegación solo con teclado.
   `2026-11-13` y `2026-11-14` = 1; `addDays('2026-02-28', 1)` = `2026-03-01`).
 - [x] **T1.2** `stock.ts` + tests (§6.2).
 - [x] **T1.3** `fefo.ts` + tests (§6.3, todos los casos listados).
-- [ ] **T1.4** `expiry.ts` + tests (§6.4, bordes 0, 30, 31, 90, 91 días, −1).
+- [x] **T1.4** `expiry.ts` + tests (§6.4, bordes 0, 30, 31, 90, 91 días, −1).
 - [ ] **T1.5** `consumption.ts` + tests (§6.7).
 - [ ] **T1.6** `projection.ts` + tests (§6.5). Casos: consumo alto → sin pérdida; lote lejano
   detrás de uno grande → pérdida parcial; consumo 0 → `null`; lote que vence antes de que se
