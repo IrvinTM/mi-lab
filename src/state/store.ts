@@ -13,6 +13,7 @@ import {
   validateIssue,
   validateReceipt,
 } from '@/domain/validation';
+import { newId as randomId } from './id';
 import { currentToday } from './today';
 
 export interface ReceiveInput {
@@ -134,7 +135,7 @@ function areaNameError(
 }
 
 export function createInventoryStore(repository: InventoryRepository, options: StoreOptions = {}) {
-  const newId = options.newId ?? (() => crypto.randomUUID());
+  const newId = options.newId ?? (() => randomId());
   const now = options.now ?? (() => new Date());
   const debounceMs = options.debounceMs ?? 300;
 

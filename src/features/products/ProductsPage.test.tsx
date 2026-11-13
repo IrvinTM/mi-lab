@@ -247,4 +247,3 @@ describe('ProductsPage (1,000 products)', () => {
     expect(within(table).getAllByRole('row')).toHaveLength(2);
   });
 });
-

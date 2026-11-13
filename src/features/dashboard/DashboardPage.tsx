@@ -112,7 +112,7 @@ export function DashboardPage() {
             stats.buySoon.map((row) => (
               <ListRow
                 key={row.product.id}
-                href={`/productos/${row.product.id}`}
+                href={`/productos/${encodeURIComponent(row.product.id)}`}
                 onClick={(event) => {
                   event.preventDefault();
                   void navigate(`/productos/${row.product.id}`);

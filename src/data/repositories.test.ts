@@ -72,6 +72,15 @@ describe('LocalStorageRepository specifics', () => {
     );
   });
 
+  it('rejects stored data that fails validation and explains why', async () => {
+    const data = sampleData();
+    data.movements[0]!.quantity = -48;
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    await expect(new LocalStorageRepository(window.localStorage).load()).rejects.toThrow(
+      /^Los datos guardados en este navegador no se pueden leer\. Movimiento n\.º 1: la cantidad/,
+    );
+  });
+
   it('turns a full storage into a RepositoryError on save', async () => {
     const full = {
       getItem: () => null,
@@ -124,7 +133,7 @@ describe('migrate', () => {
 
   it('rejects data with a missing collection', () => {
     expect(() => migrate(without(sampleData(), 'lots'))).toThrow(
-      'Al respaldo le falta la lista "lots".',
+      'Al respaldo le falta la lista de lotes ("lots").',
     );
   });
 

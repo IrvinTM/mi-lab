@@ -193,7 +193,7 @@ describe('SettingsPage', () => {
       const parsed = JSON.parse(await blob!.text()) as InventoryData;
       expect(parsed.version).toBe(1);
       expect(parsed.products).toHaveLength(1);
-      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:respaldo');
+      await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:respaldo'));
     });
 
     it('restores a valid backup after confirmation', async () => {
@@ -237,6 +237,34 @@ describe('SettingsPage', () => {
       );
       expect(document.querySelector('dialog[open]')).toBeNull();
       expect(useInventoryStore.getState().data).toBe(before);
+    });
+
+    it('rejects a file that is too big without reading it', async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const file = backupFile(dataset());
+      Object.defineProperty(file, 'size', { value: 50 * 1024 * 1024 });
+      const read = vi.spyOn(FileReader.prototype, 'readAsText');
+      await user.upload(screen.getByLabelText('Archivo de respaldo'), file);
+      expect(await screen.findByRole('alert')).toHaveTextContent(/demasiado grande/);
+      expect(read).not.toHaveBeenCalled();
+      read.mockRestore();
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    });
+
+    it('explains a hostile backup with a negative balance', async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const hostile = dataset();
+      hostile.movements.push({
+        ...hostile.movements[0]!,
+        id: 'evil',
+        type: 'issue',
+        quantity: 1e6,
+      });
+      await user.upload(screen.getByLabelText('Archivo de respaldo'), backupFile(hostile));
+      expect(await screen.findByRole('alert')).toHaveTextContent(/saldo negativo/);
+      expect(screen.queryByRole('alertdialog', { name: /Restaurar/ })).not.toBeInTheDocument();
     });
 
     it('explains a file that is not JSON', async () => {

@@ -1,5 +1,5 @@
 import type { InventoryData } from '@/domain/types';
-import { migrate } from './migrate';
+import { InvalidDataError, migrate } from './migrate';
 import { RepositoryError, type InventoryRepository } from './repository';
 
 export const STORAGE_KEY = 'mi-lab:inventory:v1';
@@ -18,9 +18,12 @@ export class LocalStorageRepository implements InventoryRepository {
     try {
       return migrate(JSON.parse(text));
     } catch (error) {
-      throw new RepositoryError('Los datos guardados en este navegador no se pueden leer.', {
-        cause: error,
-      });
+      // Same validation as a restored backup: the storage can be edited by hand or by an extension.
+      const detail = error instanceof InvalidDataError ? ` ${error.message}` : '';
+      throw new RepositoryError(
+        `Los datos guardados en este navegador no se pueden leer.${detail}`,
+        { cause: error },
+      );
     }
   }
 

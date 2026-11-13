@@ -1,5 +1,5 @@
 import { useRef, useState, type ChangeEvent } from 'react';
-import { migrate } from '@/data/migrate';
+import { backupFileError, checkBackup } from '@/state/backup';
 import { useToday } from '@/state/selectors';
 import { useInventoryStore } from '@/state/store';
 import { Alert, Button, useToast } from '@/ui';
@@ -35,7 +35,8 @@ export function BackupSection() {
     document.body.append(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(url);
+    // Revoke after the click has been handled: some browsers cancel the download otherwise.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
     setError(undefined);
     toast.show({ message: 'Respaldo descargado' });
   };
@@ -45,21 +46,27 @@ export function BackupSection() {
     const file = input.files?.[0];
     input.value = ''; // so choosing the same file again fires `change`
     if (!file) return;
-    setError(undefined);
-    try {
-      const json: unknown = JSON.parse(await readText(file));
-      migrate(json); // reject unusable files before asking to replace anything
-      setPending({ json, fileName: file.name });
-      setConfirming('restore');
-    } catch (problem) {
-      setError(
-        problem instanceof SyntaxError
-          ? 'El archivo no es un JSON válido.'
-          : problem instanceof Error
-            ? problem.message
-            : 'No se pudo leer el archivo.',
-      );
+    const tooBig = backupFileError(file);
+    if (tooBig) {
+      setError(tooBig);
+      return;
     }
+    setError(undefined);
+    let text: string;
+    try {
+      text = await readText(file);
+    } catch {
+      setError('No se pudo leer el archivo.');
+      return;
+    }
+    // Reject unusable files before asking to replace anything.
+    const check = checkBackup(text);
+    if (!check.ok) {
+      setError(check.error);
+      return;
+    }
+    setPending({ json: check.json, fileName: file.name });
+    setConfirming('restore');
   };
 
   const restore = () => {
@@ -107,7 +114,7 @@ export function BackupSection() {
         <input
           ref={fileInput}
           type="file"
-          accept="application/json"
+          accept="application/json,.json"
           hidden
           aria-label="Archivo de respaldo"
           onChange={(event) => void chooseFile(event)}

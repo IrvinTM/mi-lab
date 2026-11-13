@@ -1,3 +1,4 @@
+/// <reference types="node" />
 /**
  * Timings of the derivations and persistence with ×10 data. Run with `pnpm run perf`; it is not
  * part of `pnpm run check`. Each run uses a shallow copy of the dataset so the per-dataset memo

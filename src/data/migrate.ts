@@ -1,4 +1,14 @@
-import type { InventoryData, Settings } from '@/domain/types';
+import { isValidISODate } from '@/domain/dates';
+import type {
+  Area,
+  FundingSource,
+  InventoryData,
+  Lot,
+  Movement,
+  MovementType,
+  Product,
+  Settings,
+} from '@/domain/types';
 
 export const CURRENT_VERSION = 1;
 
@@ -10,38 +20,350 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultMaxMonths: 3,
 };
 
-const COLLECTIONS = ['areas', 'fundingSources', 'products', 'lots', 'movements'] as const;
+/**
+ * Upper bounds for data that comes from outside the app (a backup file or the browser storage).
+ * Far above any real laboratory, low enough that a hostile file cannot freeze the page.
+ */
+export const LIMITS = {
+  areas: 1_000,
+  fundingSources: 1_000,
+  products: 50_000,
+  lots: 200_000,
+  movements: 1_000_000,
+  /** Ids, codes, lot numbers, units… */
+  shortText: 120,
+  /** Names, concepts, reasons. */
+  longText: 1_000,
+  /** Largest quantity (base units) or price accepted in one record. */
+  maxNumber: 1_000_000_000,
+} as const;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+const MOVEMENT_TYPES: readonly MovementType[] = [
+  'receipt',
+  'issue',
+  'adjustment',
+  'expiry_writeoff',
+];
+
+const COLLECTION_NAMES = {
+  areas: 'áreas',
+  fundingSources: 'procedencias',
+  products: 'productos',
+  lots: 'lotes',
+  movements: 'movimientos',
+} as const;
+
+type Collection = keyof typeof COLLECTION_NAMES;
+type RawRecord = Record<string, unknown>;
+
+/** The Spanish, user-facing reason a backup or the stored data was rejected. */
+export class InvalidDataError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidDataError';
+  }
+}
+
+function isRecord(value: unknown): value is RawRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function fail(message: string): never {
+  throw new InvalidDataError(message);
+}
+
+const own = (record: RawRecord, key: string): unknown =>
+  Object.prototype.hasOwnProperty.call(record, key) ? record[key] : undefined;
+
+// --- Field readers: required fields throw; optional ones return undefined when unusable ---------
+
+function requiredText(record: RawRecord, key: string, where: string, max: number): string {
+  const value = own(record, key);
+  if (typeof value !== 'string') fail(`${where}: falta "${key}" o no es texto.`);
+  if (value.length > max) fail(`${where}: "${key}" es demasiado largo (máximo ${max} caracteres).`);
+  return value;
+}
+
+function nonEmptyText(record: RawRecord, key: string, where: string, max: number): string {
+  const value = requiredText(record, key, where, max);
+  if (!value.trim()) fail(`${where}: "${key}" está vacío.`);
+  return value;
+}
+
+function requiredDate(record: RawRecord, key: string, where: string): string {
+  const value = own(record, key);
+  if (typeof value !== 'string' || !isValidISODate(value)) {
+    fail(`${where}: "${key}" no es una fecha válida (AAAA-MM-DD).`);
+  }
+  return value;
+}
+
+function optionalText(record: RawRecord, key: string, max: number): string | undefined {
+  const value = own(record, key);
+  return typeof value === 'string' && value.length <= max ? value : undefined;
+}
+
+interface NumberRange {
+  min?: number;
+  max?: number;
+  integer?: boolean;
+}
+
+/** A finite number in [min, max] (integer if asked), or undefined. */
+function optionalNumber(
+  record: RawRecord,
+  key: string,
+  { min = 0, max = LIMITS.maxNumber as number, integer = false }: NumberRange = {},
+): number | undefined {
+  const value = own(record, key);
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  if (integer && !Number.isInteger(value)) return undefined;
+  if (value < min) return undefined;
+  return value > max ? undefined : value;
+}
+
+/** Adds only the defined optional fields, so the result has no `key: undefined`. */
+function withOptional<T extends object>(base: T, optional: Record<string, unknown>): T {
+  const result: Record<string, unknown> = { ...(base as Record<string, unknown>) };
+  for (const [key, value] of Object.entries(optional)) {
+    if (value !== undefined) result[key] = value;
+  }
+  return result as T;
+}
+
+// --- Records ------------------------------------------------------------------------------------
+
+function readList(raw: RawRecord, key: Collection): RawRecord[] {
+  const list = own(raw, key);
+  const name = COLLECTION_NAMES[key];
+  if (!Array.isArray(list)) fail(`Al respaldo le falta la lista de ${name} ("${key}").`);
+  if (list.length > LIMITS[key]) {
+    fail(`El respaldo supera el máximo de ${LIMITS[key]} ${name} (tiene ${list.length}).`);
+  }
+  list.forEach((item, index) => {
+    if (!isRecord(item)) fail(`${capitalize(name)} n.º ${index + 1}: no es un registro válido.`);
+  });
+  return list as RawRecord[];
+}
+
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+function readArea(record: RawRecord, index: number): Area {
+  const where = `Área n.º ${index + 1}`;
+  return {
+    id: nonEmptyText(record, 'id', where, LIMITS.shortText),
+    name: nonEmptyText(record, 'name', where, LIMITS.longText),
+  };
+}
+
+function readFundingSource(record: RawRecord, index: number): FundingSource {
+  const where = `Procedencia n.º ${index + 1}`;
+  const code = optionalNumber(record, 'code', { integer: true });
+  if (code === undefined) fail(`${where}: "code" debe ser un número entero no negativo.`);
+  return { code, name: nonEmptyText(record, 'name', where, LIMITS.longText) };
+}
+
+function readProduct(record: RawRecord, index: number): Product {
+  const where = `Producto n.º ${index + 1}`;
+  const product: Product = {
+    id: nonEmptyText(record, 'id', where, LIMITS.shortText),
+    name: nonEmptyText(record, 'name', where, LIMITS.longText),
+    areaId: nonEmptyText(record, 'areaId', where, LIMITS.shortText),
+    unit: nonEmptyText(record, 'unit', where, LIMITS.shortText),
+  };
+  const minStock = optionalNumber(record, 'minStock');
+  let maxStock = optionalNumber(record, 'maxStock');
+  // A max below the min is unusable for purchasing; drop it (the product shows "Sin datos" or uses the default).
+  if (minStock !== undefined && maxStock !== undefined && maxStock < minStock) maxStock = undefined;
+  return withOptional(product, {
+    code: optionalText(record, 'code', LIMITS.shortText),
+    cardNumber: optionalText(record, 'cardNumber', LIMITS.shortText),
+    packaging: optionalText(record, 'packaging', LIMITS.shortText),
+    unitsPerPackage: optionalNumber(record, 'unitsPerPackage', { integer: true, min: 1 }),
+    minStock,
+    maxStock,
+    avgMonthlyConsumption: optionalNumber(record, 'avgMonthlyConsumption'),
+    archived: own(record, 'archived') === true ? true : undefined,
+  });
+}
+
+function readLot(record: RawRecord, index: number): Lot {
+  const where = `Lote n.º ${index + 1}`;
+  const lot: Lot = {
+    id: nonEmptyText(record, 'id', where, LIMITS.shortText),
+    productId: nonEmptyText(record, 'productId', where, LIMITS.shortText),
+    lotNumber: nonEmptyText(record, 'lotNumber', where, LIMITS.shortText),
+    expiryDate: requiredDate(record, 'expiryDate', where),
+    receivedDate: requiredDate(record, 'receivedDate', where),
+  };
+  return withOptional(lot, {
+    sourceCode: optionalNumber(record, 'sourceCode', { integer: true }),
+    unitPrice: optionalNumber(record, 'unitPrice'),
+  });
+}
+
+function readMovement(record: RawRecord, index: number): Movement {
+  const where = `Movimiento n.º ${index + 1}`;
+  const type = own(record, 'type');
+  if (!MOVEMENT_TYPES.includes(type as MovementType)) {
+    fail(`${where}: tipo de movimiento desconocido.`);
+  }
+  const quantity = own(record, 'quantity');
+  if (
+    typeof quantity !== 'number' ||
+    !Number.isFinite(quantity) ||
+    Math.abs(quantity) > LIMITS.maxNumber ||
+    (type === 'adjustment' ? quantity === 0 : quantity <= 0)
+  ) {
+    fail(
+      type === 'adjustment'
+        ? `${where}: la cantidad del ajuste debe ser un número distinto de 0.`
+        : `${where}: la cantidad debe ser un número mayor que 0.`,
+    );
+  }
+  const date = requiredDate(record, 'date', where);
+  const createdAt = optionalText(record, 'createdAt', LIMITS.shortText);
+  const movement: Movement = {
+    id: nonEmptyText(record, 'id', where, LIMITS.shortText),
+    type: type as MovementType,
+    date,
+    productId: nonEmptyText(record, 'productId', where, LIMITS.shortText),
+    lotId: nonEmptyText(record, 'lotId', where, LIMITS.shortText),
+    quantity,
+    concept: optionalText(record, 'concept', LIMITS.longText) ?? '',
+    // Audit only; a missing or odd value is recoverable.
+    createdAt: createdAt ?? `${date}T00:00:00.000Z`,
+  };
+  const reason = optionalText(record, 'fefoOverrideReason', LIMITS.longText);
+  return withOptional(movement, {
+    unitPrice: optionalNumber(record, 'unitPrice'),
+    sourceCode: optionalNumber(record, 'sourceCode', { integer: true }),
+    fefoOverrideReason: reason?.trim() ? reason : undefined,
+  });
+}
+
+/** Unknown or invalid settings fall back to the defaults; extra keys are dropped. */
+function readSettings(raw: unknown): Settings {
+  if (raw === undefined) return { ...DEFAULT_SETTINGS };
+  if (!isRecord(raw)) fail('Los ajustes del respaldo no son válidos.');
+  const days = { integer: true, min: 1, max: 3_650 };
+  const months = { integer: true, min: 1, max: 120 };
+
+  const labName = optionalText(raw, 'labName', LIMITS.longText)?.trim();
+  let criticalDays = optionalNumber(raw, 'criticalDays', days) ?? DEFAULT_SETTINGS.criticalDays;
+  let warningDays = optionalNumber(raw, 'warningDays', days) ?? DEFAULT_SETTINGS.warningDays;
+  if (warningDays <= criticalDays) {
+    ({ criticalDays, warningDays } = DEFAULT_SETTINGS);
+  }
+  let defaultMinMonths =
+    optionalNumber(raw, 'defaultMinMonths', months) ?? DEFAULT_SETTINGS.defaultMinMonths;
+  let defaultMaxMonths =
+    optionalNumber(raw, 'defaultMaxMonths', months) ?? DEFAULT_SETTINGS.defaultMaxMonths;
+  if (defaultMaxMonths < defaultMinMonths) {
+    ({ defaultMinMonths, defaultMaxMonths } = DEFAULT_SETTINGS);
+  }
+  const todayOverride = own(raw, 'todayOverride');
+
+  return withOptional<Settings>(
+    {
+      labName: labName || DEFAULT_SETTINGS.labName,
+      criticalDays,
+      warningDays,
+      defaultMinMonths,
+      defaultMaxMonths,
+    },
+    {
+      todayOverride:
+        typeof todayOverride === 'string' && isValidISODate(todayOverride)
+          ? todayOverride
+          : undefined,
+    },
+  );
+}
+
+// --- Integrity ----------------------------------------------------------------------------------
+
+function assertUniqueIds(items: readonly { id: string }[], label: string): void {
+  const seen = new Set<string>();
+  for (const { id } of items) {
+    if (seen.has(id)) fail(`Hay ${label} con el id repetido "${id}".`);
+    seen.add(id);
+  }
+}
+
+/** References between records must exist and no lot may end with a negative balance. */
+function assertIntegrity(data: InventoryData): void {
+  assertUniqueIds(data.areas, 'áreas');
+  assertUniqueIds(data.products, 'productos');
+  assertUniqueIds(data.lots, 'lotes');
+  assertUniqueIds(data.movements, 'movimientos');
+  const codes = new Set<number>();
+  for (const { code } of data.fundingSources) {
+    if (codes.has(code)) fail(`Hay procedencias con el código repetido ${code}.`);
+    codes.add(code);
+  }
+
+  const areaIds = new Set(data.areas.map((area) => area.id));
+  for (const product of data.products) {
+    if (!areaIds.has(product.areaId)) {
+      fail(`El producto "${product.name}" pertenece a un área que no existe.`);
+    }
+  }
+  const productIds = new Set(data.products.map((product) => product.id));
+  const lots = new Map<string, Lot>();
+  for (const lot of data.lots) {
+    if (!productIds.has(lot.productId)) {
+      fail(`El lote ${lot.lotNumber} pertenece a un producto que no existe.`);
+    }
+    lots.set(lot.id, lot);
+  }
+  const balances = new Map<string, number>();
+  for (const movement of data.movements) {
+    const lot = lots.get(movement.lotId);
+    if (!lot) fail(`Un movimiento del ${movement.date} apunta a un lote que no existe.`);
+    if (lot.productId !== movement.productId) {
+      fail(`Un movimiento del lote ${lot.lotNumber} no coincide con el producto del lote.`);
+    }
+    const sign = movement.type === 'issue' || movement.type === 'expiry_writeoff' ? -1 : 1;
+    balances.set(lot.id, (balances.get(lot.id) ?? 0) + sign * movement.quantity);
+  }
+  for (const [lotId, balance] of balances) {
+    // Tolerance for fractional quantities summed in floating point.
+    if (balance < -1e-9) fail(`El lote ${lots.get(lotId)!.lotNumber} quedaría con saldo negativo.`);
+  }
 }
 
 /**
  * Turns raw stored/imported JSON into `InventoryData`. Only version 1 exists for now; future
- * versions add a step per version here. Throws an `Error` with a Spanish, user-facing message
- * if the data is not a usable backup.
+ * versions add a step per version here.
+ *
+ * The input is untrusted (a backup file, or storage another tab or extension could change), so
+ * every record is rebuilt field by field: unknown keys are dropped (including `__proto__`),
+ * unusable optional fields and settings fall back to "not set" / the defaults, and anything that
+ * would break the screens or the balances (wrong types, invalid dates, non-positive or huge
+ * quantities, repeated ids, dangling references, negative balances, oversized lists or texts)
+ * throws an `InvalidDataError` with a Spanish, user-facing message.
  */
 export function migrate(raw: unknown): InventoryData {
-  if (!isRecord(raw)) throw new Error('El archivo no es un respaldo válido.');
-  if (raw.version !== CURRENT_VERSION) {
-    throw new Error(
-      `Versión de respaldo no compatible (${String(raw.version ?? 'desconocida')}). Se esperaba la versión ${CURRENT_VERSION}.`,
+  if (!isRecord(raw)) fail('El archivo no es un respaldo válido.');
+  const version = own(raw, 'version');
+  if (version !== CURRENT_VERSION) {
+    const shown =
+      typeof version === 'number' || typeof version === 'string' ? version : 'desconocida';
+    fail(
+      `Versión de respaldo no compatible (${String(shown).slice(0, 20)}). Se esperaba la versión ${CURRENT_VERSION}.`,
     );
   }
-  for (const key of COLLECTIONS) {
-    if (!Array.isArray(raw[key])) throw new Error(`Al respaldo le falta la lista "${key}".`);
-  }
-  if (raw.settings !== undefined && !isRecord(raw.settings)) {
-    throw new Error('Los ajustes del respaldo no son válidos.');
-  }
 
-  return {
+  const data: InventoryData = {
     version: CURRENT_VERSION,
-    areas: raw.areas as InventoryData['areas'],
-    fundingSources: raw.fundingSources as InventoryData['fundingSources'],
-    products: raw.products as InventoryData['products'],
-    lots: raw.lots as InventoryData['lots'],
-    movements: raw.movements as InventoryData['movements'],
-    settings: { ...DEFAULT_SETTINGS, ...(raw.settings as Partial<Settings> | undefined) },
+    areas: readList(raw, 'areas').map(readArea),
+    fundingSources: readList(raw, 'fundingSources').map(readFundingSource),
+    products: readList(raw, 'products').map(readProduct),
+    lots: readList(raw, 'lots').map(readLot),
+    movements: readList(raw, 'movements').map(readMovement),
+    settings: readSettings(own(raw, 'settings')),
   };
+  assertIntegrity(data);
+  return data;
 }
