@@ -1,5 +1,5 @@
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { PackageSearch } from 'lucide-react';
+import { PackageSearch, Plus } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router';
 import { EMPTY, formatCoverage, formatDate, formatStock } from '@/lib/format';
 import type { ProductRow } from '@/state/derive';
@@ -18,6 +18,7 @@ import {
   type TableColumn,
   type TableSort,
 } from '@/ui';
+import { EditProductSheet } from '../shared/EditProductSheet';
 import { PageActions } from '../shared/PageActions';
 import { ExpiryBadge, ReorderBadge } from '../shared/StatusBadges';
 import {
@@ -171,6 +172,7 @@ export function ProductsPage() {
   const [areaId, setAreaId] = useState('all');
   const [status, setStatus] = useState<StatusFilter>('all');
   const [sort, setSort] = useState<TableSort>(DEFAULT_SORT);
+  const [creating, setCreating] = useState(false);
 
   const focusSearch = (location.state as { focusSearch?: boolean } | null)?.focusSearch === true;
   useEffect(() => {
@@ -198,7 +200,18 @@ export function ProductsPage() {
 
   return (
     <>
-      <PageHeader title="Productos" actions={<PageActions />} />
+      <PageHeader
+        title="Productos"
+        actions={
+          <>
+            <Button icon={Plus} variant="tinted" onClick={() => setCreating(true)}>
+              Nuevo producto
+            </Button>
+            <PageActions />
+          </>
+        }
+      />
+      <EditProductSheet open={creating} onClose={() => setCreating(false)} />
 
       <div className="mb-4 flex flex-col gap-3">
         <SearchField

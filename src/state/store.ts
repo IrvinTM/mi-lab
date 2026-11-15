@@ -70,11 +70,18 @@ export interface InventoryState {
   /** Deletes those movements and the lots left without movements. False if it would leave a negative balance. */
   undo(movementIds: string[]): boolean;
   upsertProduct(product: Product): void;
+  /** Creates a product with a new id. Names are unique within an area (ignoring case and accents). */
+  addProduct(draft: Omit<Product, 'id'>): ActionResult<{ productId: string }>;
   /** Names are unique ignoring case and accents. */
   addArea(name: string): ActionResult<{ areaId: string }>;
   renameArea(id: string, name: string): ActionResult;
   /** Only areas without products (archived ones included) can be removed. */
   removeArea(id: string): ActionResult;
+  /** Funding sources: names are unique (ignoring case and accents); `code` defaults to the next free number. */
+  addFundingSource(name: string, code?: number): ActionResult<{ code: number }>;
+  renameFundingSource(code: number, name: string): ActionResult;
+  /** Only sources no lot or movement refers to can be removed. */
+  removeFundingSource(code: number): ActionResult;
   updateSettings(patch: Partial<Settings>): void;
   /** Async: the demo data is its own chunk, downloaded only when needed. */
   resetToSeed(): Promise<void>;
@@ -124,6 +131,20 @@ function areaNameError(
   const key = normalizeText(name);
   if (areas.some((a) => a.id !== exceptId && normalizeText(a.name) === key)) {
     return 'Ya existe un área con ese nombre.';
+  }
+  return undefined;
+}
+
+/** Why `name` cannot be a funding source name, or `undefined` if it can. `exceptCode` is the source being renamed. */
+function sourceNameError(
+  sources: readonly { code: number; name: string }[],
+  name: string,
+  exceptCode?: number,
+): string | undefined {
+  if (!name.trim()) return 'Escribe el nombre de la procedencia.';
+  const key = normalizeText(name);
+  if (sources.some((s) => s.code !== exceptCode && normalizeText(s.name) === key)) {
+    return 'Ya existe una procedencia con ese nombre.';
   }
   return undefined;
 }
@@ -374,6 +395,22 @@ export function createInventoryStore(repository: InventoryRepository, options: S
         });
       },
 
+      addProduct(draft) {
+        const { data } = get();
+        const name = draft.name.trim();
+        if (!name) return failure({ name: 'Ingresa el nombre del producto.' });
+        if (!data.areas.some((a) => a.id === draft.areaId)) {
+          return failure({ areaId: 'Elige un área.' });
+        }
+        const key = normalizeText(name);
+        if (data.products.some((p) => p.areaId === draft.areaId && normalizeText(p.name) === key)) {
+          return failure({ name: 'Ya existe un producto con ese nombre en esta área.' });
+        }
+        const product: Product = { ...draft, name, id: newId() };
+        setData({ ...data, products: [...data.products, product] });
+        return { ok: true, productId: product.id };
+      },
+
       addArea(name) {
         const { data } = get();
         const error = areaNameError(data.areas, name);
@@ -381,6 +418,58 @@ export function createInventoryStore(repository: InventoryRepository, options: S
         const area = { id: newId(), name: name.trim() };
         setData({ ...data, areas: [...data.areas, area] });
         return { ok: true, areaId: area.id };
+      },
+
+      addFundingSource(name, code) {
+        const { data } = get();
+        const errors: Record<string, string> = {};
+        const nameError = sourceNameError(data.fundingSources, name);
+        if (nameError) errors.name = nameError;
+        if (code !== undefined) {
+          if (!Number.isInteger(code) || code < 0 || code > 999_999) {
+            errors.code = 'El código debe ser un número entero entre 0 y 999999.';
+          } else if (data.fundingSources.some((s) => s.code === code)) {
+            errors.code = 'Ya existe una procedencia con ese código.';
+          }
+        }
+        if (Object.keys(errors).length > 0) return failure(errors);
+        const next = code ?? data.fundingSources.reduce((max, s) => Math.max(max, s.code), 0) + 1;
+        const source = { code: next, name: name.trim() };
+        setData({ ...data, fundingSources: [...data.fundingSources, source] });
+        return { ok: true, code: next };
+      },
+
+      renameFundingSource(code, name) {
+        const { data } = get();
+        if (!data.fundingSources.some((s) => s.code === code)) {
+          return failure({ code: 'No se encontró la procedencia.' });
+        }
+        const error = sourceNameError(data.fundingSources, name, code);
+        if (error) return failure({ name: error });
+        setData({
+          ...data,
+          fundingSources: data.fundingSources.map((s) =>
+            s.code === code ? { ...s, name: name.trim() } : s,
+          ),
+        });
+        return { ok: true };
+      },
+
+      removeFundingSource(code) {
+        const { data } = get();
+        if (!data.fundingSources.some((s) => s.code === code)) {
+          return failure({ code: 'No se encontró la procedencia.' });
+        }
+        const used =
+          data.lots.some((l) => l.sourceCode === code) ||
+          data.movements.some((m) => m.sourceCode === code);
+        if (used) {
+          return failure({
+            code: 'No se puede eliminar: hay lotes o movimientos con esta procedencia.',
+          });
+        }
+        setData({ ...data, fundingSources: data.fundingSources.filter((s) => s.code !== code) });
+        return { ok: true };
       },
 
       renameArea(id, name) {

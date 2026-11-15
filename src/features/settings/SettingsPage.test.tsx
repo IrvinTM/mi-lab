@@ -312,17 +312,17 @@ describe('SettingsPage', () => {
     it('adds an area and rejects empty or repeated names', async () => {
       const user = userEvent.setup();
       renderPage();
-      await user.click(screen.getByRole('button', { name: 'Agregar' }));
+      await user.click(screen.getByRole('button', { name: 'Agregar área' }));
       expect(screen.getByText('Escribe el nombre del área.')).toBeInTheDocument();
 
       await user.type(screen.getByLabelText('Nueva área'), 'hematologia');
-      await user.click(screen.getByRole('button', { name: 'Agregar' }));
+      await user.click(screen.getByRole('button', { name: 'Agregar área' }));
       expect(screen.getByText('Ya existe un área con ese nombre.')).toBeInTheDocument();
       expect(useInventoryStore.getState().data.areas).toHaveLength(2);
 
       await user.clear(screen.getByLabelText('Nueva área'));
       await user.type(screen.getByLabelText('Nueva área'), 'Microbiología');
-      await user.click(screen.getByRole('button', { name: 'Agregar' }));
+      await user.click(screen.getByRole('button', { name: 'Agregar área' }));
       expect(useInventoryStore.getState().data.areas.map((a) => a.name)).toContain('Microbiología');
       expect(areaRow('Microbiología')).toBeInTheDocument();
       expect(screen.getByLabelText('Nueva área')).toHaveValue('');
@@ -369,6 +369,52 @@ describe('SettingsPage', () => {
       );
       expect(useInventoryStore.getState().data.areas.map((a) => a.id)).toEqual(['a1']);
       expect(screen.getByText('Área eliminada · Hematología')).toBeInTheDocument();
+    });
+  });
+  describe('procedencias', () => {
+    it('lists the sources, adds one with the next code and rejects repeated names or codes', async () => {
+      const user = userEvent.setup();
+      renderPage();
+      expect(screen.getByText('GOES')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Agregar procedencia' }));
+      expect(screen.getByText('Escribe el nombre de la procedencia.')).toBeInTheDocument();
+
+      await user.type(screen.getByLabelText('Nueva procedencia'), 'goes');
+      await user.click(screen.getByRole('button', { name: 'Agregar procedencia' }));
+      expect(screen.getByText('Ya existe una procedencia con ese nombre.')).toBeInTheDocument();
+
+      await user.clear(screen.getByLabelText('Nueva procedencia'));
+      await user.type(screen.getByLabelText('Nueva procedencia'), 'Donación');
+      await user.type(screen.getByLabelText('Código (opcional)'), '1');
+      await user.click(screen.getByRole('button', { name: 'Agregar procedencia' }));
+      expect(screen.getByText('Ya existe una procedencia con ese código.')).toBeInTheDocument();
+
+      await user.clear(screen.getByLabelText('Código (opcional)'));
+      await user.click(screen.getByRole('button', { name: 'Agregar procedencia' }));
+      expect(useInventoryStore.getState().data.fundingSources).toContainEqual({
+        code: 2,
+        name: 'Donación',
+      });
+      expect(screen.getByLabelText('Nueva procedencia')).toHaveValue('');
+    });
+
+    it('renames and removes an unused source', async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(screen.getByRole('button', { name: 'Renombrar GOES' }));
+      const dialog = screen.getByRole('dialog', { name: 'Renombrar procedencia' });
+      const field = within(dialog).getByLabelText('Nombre de la procedencia');
+      await user.clear(field);
+      await user.type(field, 'MINSAL');
+      await user.click(within(dialog).getByRole('button', { name: 'Renombrar' }));
+      expect(useInventoryStore.getState().data.fundingSources[0]!.name).toBe('MINSAL');
+
+      await user.click(screen.getByRole('button', { name: 'Eliminar MINSAL' }));
+      await user.click(
+        within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Eliminar' }),
+      );
+      expect(useInventoryStore.getState().data.fundingSources).toHaveLength(0);
     });
   });
 });

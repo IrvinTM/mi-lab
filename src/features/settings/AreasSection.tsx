@@ -140,7 +140,7 @@ export function AreasSection() {
           error={addError}
           help="Por ejemplo: Hematología."
         />
-        <Button type="submit" variant="tinted" className="sheet:mt-6">
+        <Button type="submit" variant="tinted" aria-label="Agregar área" className="sheet:mt-6">
           Agregar
         </Button>
       </form>

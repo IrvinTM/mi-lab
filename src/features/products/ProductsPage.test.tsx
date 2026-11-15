@@ -4,7 +4,9 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { buildSeed } from '@/data/seed/buildSeed';
 import { useInventoryStore } from '@/state/store';
 import type { InventoryData } from '@/domain/types';
+import { installDialogPolyfill } from '@/test/dialog-polyfill';
 import { sampleData } from '@/test/fixtures';
+import { ToastProvider } from '@/ui';
 import { largeData } from '@/test/largeData';
 import { ProductsPage } from './ProductsPage';
 
@@ -25,13 +27,15 @@ function Detail() {
 
 function renderPage(state?: unknown) {
   return render(
-    <MemoryRouter initialEntries={[{ pathname: '/productos', state }]}>
-      <Routes>
-        <Route path="/productos" element={<ProductsPage />} />
-        <Route path="/productos/:id" element={<Detail />} />
-        <Route path="*" element={<p>Otra ruta</p>} />
-      </Routes>
-    </MemoryRouter>,
+    <ToastProvider>
+      <MemoryRouter initialEntries={[{ pathname: '/productos', state }]}>
+        <Routes>
+          <Route path="/productos" element={<ProductsPage />} />
+          <Route path="/productos/:id" element={<Detail />} />
+          <Route path="*" element={<p>Otra ruta</p>} />
+        </Routes>
+      </MemoryRouter>
+    </ToastProvider>,
   );
 }
 
@@ -56,6 +60,7 @@ function bodyRowNames(): string[] {
 }
 
 beforeEach(() => {
+  installDialogPolyfill();
   mockViewport(true);
   setData(seedData());
 });
@@ -245,5 +250,60 @@ describe('ProductsPage (1,000 products)', () => {
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar productos' }), '0999');
     expect(await screen.findByText('1 producto')).toBeInTheDocument();
     expect(within(table).getAllByRole('row')).toHaveLength(2);
+  });
+});
+
+describe('Nuevo producto', () => {
+  it('creates a product from the sheet and shows it in the list', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const before = useInventoryStore.getState().data.products.length;
+    await user.click(screen.getByRole('button', { name: 'Nuevo producto' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo producto' });
+    await user.type(within(dialog).getByLabelText('Nombre'), '  Ferritina ');
+    await user.type(within(dialog).getByLabelText('Existencia mínima'), '50');
+    await user.click(within(dialog).getByRole('button', { name: 'Crear producto' }));
+
+    const { products } = useInventoryStore.getState().data;
+    expect(products).toHaveLength(before + 1);
+    expect(products.at(-1)).toMatchObject({ name: 'Ferritina', unit: 'prueba', minStock: 50 });
+    expect(await screen.findByText('Producto creado · Ferritina')).toBeInTheDocument();
+    expect(bodyRowNames()).toContain('Ferritina');
+  });
+
+  it('asks for a name and rejects a duplicate in the same area', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const before = useInventoryStore.getState().data.products.length;
+    await user.click(screen.getByRole('button', { name: 'Nuevo producto' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo producto' });
+    await user.click(within(dialog).getByRole('button', { name: 'Crear producto' }));
+    expect(within(dialog).getByText('Ingresa el nombre del producto.')).toBeInTheDocument();
+
+    const existing = useInventoryStore.getState().data.products[0]!;
+    const area = useInventoryStore.getState().data.areas.find((a) => a.id === existing.areaId)!;
+    await user.selectOptions(within(dialog).getByLabelText('Área'), area.name);
+    await user.type(within(dialog).getByLabelText('Nombre'), existing.name.toUpperCase());
+    await user.click(within(dialog).getByRole('button', { name: 'Crear producto' }));
+    expect(
+      within(dialog).getByText('Ya existe un producto con ese nombre en esta área.'),
+    ).toBeInTheDocument();
+    expect(useInventoryStore.getState().data.products).toHaveLength(before);
+  });
+  it('lets you type a base unit that is not in the list', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Nuevo producto' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo producto' });
+    await user.type(within(dialog).getByLabelText('Nombre'), 'Control de calidad');
+    await user.selectOptions(within(dialog).getByLabelText('Unidad base'), 'Otra…');
+    await user.click(within(dialog).getByRole('button', { name: 'Crear producto' }));
+    expect(within(dialog).getByText('Escribe la unidad base.')).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText('Otra unidad base'), ' vial ');
+    await user.click(within(dialog).getByRole('button', { name: 'Crear producto' }));
+    expect(useInventoryStore.getState().data.products.at(-1)).toMatchObject({
+      name: 'Control de calidad',
+      unit: 'vial',
+    });
   });
 });

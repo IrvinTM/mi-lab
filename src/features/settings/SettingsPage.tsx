@@ -1,6 +1,7 @@
 import { PageHeader } from '@/ui';
 import { AreasSection } from './AreasSection';
 import { BackupSection } from './BackupSection';
+import { FundingSourcesSection } from './FundingSourcesSection';
 import { GeneralSettingsForm } from './GeneralSettingsForm';
 import { SimulatedDateSection } from './SimulatedDateSection';
 
@@ -13,6 +14,7 @@ export function SettingsPage() {
         <SimulatedDateSection />
         <BackupSection />
         <AreasSection />
+        <FundingSourcesSection />
       </div>
     </>
   );

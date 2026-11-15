@@ -564,3 +564,77 @@ describe('areas', () => {
     expect(failureOf(store.getState().removeArea(areaId)).errors.id).toMatch(/No se encontró/);
   });
 });
+
+describe('addProduct', () => {
+  it('creates a product with a new id and trimmed name', async () => {
+    const { store } = await readyStore();
+    const areaId = store.getState().data.areas[0]!.id;
+    const result = store.getState().addProduct({ name: '  Ferritina ', areaId, unit: 'prueba' });
+    expect(result.ok).toBe(true);
+    const created = store.getState().data.products.at(-1)!;
+    expect(created).toMatchObject({ name: 'Ferritina', areaId, unit: 'prueba' });
+    expect(result).toMatchObject({ productId: created.id });
+  });
+
+  it('rejects empty names, unknown areas and duplicates in the same area', async () => {
+    const { store } = await readyStore();
+    const existing = store.getState().data.products[0]!;
+    const before = store.getState().data;
+    const add = (name: string, areaId = existing.areaId) =>
+      store.getState().addProduct({ name, areaId, unit: 'prueba' });
+    expect(failureOf(add('  ')).errors.name).toMatch(/Ingresa el nombre/);
+    expect(failureOf(add('X', 'nope')).errors.areaId).toMatch(/Elige un área/);
+    expect(failureOf(add(existing.name.toUpperCase())).errors.name).toMatch(/Ya existe/);
+    expect(store.getState().data).toBe(before);
+  });
+});
+
+describe('funding sources', () => {
+  const failed = (r: { ok: boolean }) => failureOf(r as never);
+
+  it('adds with the next free code or an explicit one', async () => {
+    const { store } = await readyStore();
+    const max = Math.max(0, ...store.getState().data.fundingSources.map((s) => s.code));
+    expect(store.getState().addFundingSource('  Donación ')).toEqual({ ok: true, code: max + 1 });
+    expect(store.getState().addFundingSource('Otra', 900)).toEqual({ ok: true, code: 900 });
+    expect(store.getState().data.fundingSources.at(-2)?.name).toBe('Donación');
+  });
+
+  it('rejects empty or duplicate names and bad or repeated codes', async () => {
+    const { store } = await readyStore();
+    const existing = store.getState().data.fundingSources[0]!;
+    const before = store.getState().data;
+    expect(failed(store.getState().addFundingSource(' ')).errors.name).toMatch(/Escribe el nombre/);
+    expect(
+      failed(store.getState().addFundingSource(existing.name.toUpperCase())).errors.name,
+    ).toMatch(/Ya existe/);
+    expect(failed(store.getState().addFundingSource('X', existing.code)).errors.code).toMatch(
+      /Ya existe/,
+    );
+    expect(failed(store.getState().addFundingSource('X', -1)).errors.code).toMatch(/entero/);
+    expect(failed(store.getState().addFundingSource('X', 1.5)).errors.code).toMatch(/entero/);
+    expect(store.getState().data).toBe(before);
+  });
+
+  it('renames, and only removes sources nothing refers to', async () => {
+    const { store } = await readyStore();
+    const { code } = store.getState().addFundingSource('Temporal') as { ok: true; code: number };
+    expect(store.getState().renameFundingSource(code, 'Temporal 2').ok).toBe(true);
+    expect(store.getState().removeFundingSource(code).ok).toBe(true);
+    expect(failed(store.getState().renameFundingSource(code, 'x')).errors.code).toMatch(
+      /No se encontró/,
+    );
+
+    const used = store.getState().addFundingSource('Usada') as { ok: true; code: number };
+    const data = store.getState().data;
+    store.setState({
+      data: {
+        ...data,
+        lots: data.lots.map((l, i) => (i === 0 ? { ...l, sourceCode: used.code } : l)),
+      },
+    });
+    expect(failed(store.getState().removeFundingSource(used.code)).errors.code).toMatch(
+      /No se puede eliminar/,
+    );
+  });
+});
