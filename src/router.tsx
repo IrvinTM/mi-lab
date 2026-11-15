@@ -40,6 +40,12 @@ export const appRoutes: RouteObject[] = [
         }),
       },
       {
+        path: 'informes',
+        lazy: async () => ({
+          Component: (await import('@/features/reports/ReportsPage')).ReportsPage,
+        }),
+      },
+      {
         path: 'entrada',
         lazy: async () => ({
           Component: (await import('@/features/receive/ReceivePage')).ReceivePage,

@@ -2,6 +2,7 @@ import {
   CalendarClock,
   CircleAlert,
   LayoutDashboard,
+  FileSpreadsheet,
   FlaskConical,
   Settings,
   ShoppingCart,
@@ -22,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/productos', label: 'Productos', icon: FlaskConical },
   { to: '/vencimientos', label: 'Vencimientos', icon: CalendarClock },
   { to: '/compras', label: 'Compras', icon: ShoppingCart },
+  { to: '/informes', label: 'Informes', icon: FileSpreadsheet },
 ];
 const SETTINGS_ITEM: NavItem = { to: '/ajustes', label: 'Ajustes', icon: Settings };
 
