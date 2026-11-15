@@ -47,7 +47,7 @@ describe('Shell', () => {
       within(nav)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Resumen', 'Productos', 'Vencimientos', 'Compras']);
+    ).toEqual(['Resumen', 'Productos', 'Vencimientos', 'Compras', 'Informes']);
     expect(screen.getAllByText('Laboratorio clínico').length).toBeGreaterThan(0);
   });
 
