@@ -80,7 +80,20 @@ Pantalla **Compras**.
 - Abre cualquier producto para ver su **cobertura efectiva**, los lotes en orden FEFO
   (*"Usar este primero"*) y la **proyección por lote** (*"≈ 40 pruebas se vencerán sin usar"*).
 
-> La exportación del pedido a CSV queda para una segunda etapa (ver `docs/PLAN.md` §12).
+> El pedido a CSV queda para una segunda etapa (ver `docs/PLAN.md` §12); el informe en Excel ya existe (sección 6).
+
+## 6. Informe en Excel (≈ 1 min)
+
+Pantalla **Informes**.
+
+1. Elige el periodo (*Este mes*, *Mes anterior*, *Elegir mes* o *Rango*). La vista previa muestra
+   cuántas entradas, salidas, ajustes y bajas hubo, con unidades y valor.
+2. Pulsa **Descargar informe (Excel)**. Se guarda `mi-lab-informe-<desde>_<hasta>.xlsx`.
+3. Ábrelo en Excel o Google Sheets: 5 hojas (*Resumen*, *Por producto*, *Movimientos*,
+   *Existencias*, *Lotes*) con filtros y encabezado fijo. En *Por producto*, inicial + entradas −
+   salidas ± ajustes − bajas = final.
+
+> Mensaje: "El informe mensual sale en un clic y cuadra con el kardex."
 
 ## Extras si hay tiempo
 
