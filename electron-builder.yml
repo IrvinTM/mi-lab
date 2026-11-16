@@ -13,6 +13,18 @@ files:
   - package.json
   - '!node_modules'
 asar: true
+# Electron fuses (flipped in the binary at build time, cannot be changed by config or env):
+# the installed Mi-lab.exe cannot be used as a Node.js interpreter, ignores NODE_OPTIONS and
+# --inspect, only runs the code inside its own app.asar and refuses an altered app.asar.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  loadBrowserProcessSpecificV8Snapshot: false
+  grantFileProtocolExtraPrivileges: false
 electronLanguages:
   - es
   - es-419

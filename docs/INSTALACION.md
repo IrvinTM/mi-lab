@@ -6,7 +6,11 @@ administrador.
 ## 1. Descargar
 
 1. Abre la página de versiones del proyecto (**Releases**) en GitHub.
-2. En la versión más reciente, descarga el archivo **`Mi-lab-Setup-….exe`**.
+2. En la versión más reciente, descarga el archivo **`Mi-lab-Setup-….exe`**. Descárgalo solo de
+   ahí: nunca de un correo, un enlace enviado por chat o una memoria USB de origen desconocido.
+3. (Recomendado, o que lo haga TI) Comprueba que el archivo es el original: en PowerShell,
+   `Get-FileHash .\Mi-lab-Setup-1.0.0.exe -Algorithm SHA256` debe dar el mismo valor que aparece
+   en `SHA256SUMS.txt` de la misma versión.
 
 ## 2. Instalar
 
@@ -27,7 +31,9 @@ sola.
 
 Cada día en que haya cambios, Mi-lab guarda una copia en la carpeta de respaldos (se conservan las
 últimas 30). Puedes ver la ruta y la fecha de la última copia en **Ajustes → Respaldo**.
-Recomendación: copia esa carpeta a una memoria USB cada semana.
+Recomendación: copia esa carpeta a una memoria USB cada semana. Si tu carpeta `Documentos` se
+sincroniza con OneDrive, los respaldos también se suben a la nube: decide con TI si eso está
+permitido (ver `docs/SEGURIDAD.md`).
 
 ## 4. Restaurar un respaldo
 

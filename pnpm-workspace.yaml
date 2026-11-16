@@ -1,6 +1,18 @@
 minimumReleaseAgeExclude:
   - '@testing-library/user-event@14.6.10'
   - prettier@3.10.1
+  # Latest stable Electron (security fixes), reviewed by hand on 2026-11-16.
+  - electron@45.3.2
 # electron-winstaller (Squirrel) is only pulled in by electron-builder; the NSIS installer does not use it.
 allowBuilds:
   electron-winstaller: false
+# Security (docs/SEGURIDAD.md):
+# - New dependencies are saved with an exact version (no ^ or ~), so nothing moves on its own.
+# - A version must be published for 3 days before pnpm accepts it: most malicious releases are
+#   detected and pulled within hours.
+savePrefix: ''
+minimumReleaseAge: 4320
+overrides:
+  # GHSA-g3hv-75wg-m249 (moderate, ReDoS) in minimatch 7–11.0.0, pulled in by dev tools only
+  # (typescript-eslint, electron-builder). Nothing of it ships in the app.
+  'minimatch@>=7.0.0 <11.0.1': '11.0.8'

@@ -1,19 +1,18 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { extname, join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { readFile } from 'node:fs/promises';
+import { extname, join, sep } from 'node:path';
 import {
   app,
   BrowserWindow,
   ipcMain,
   Menu,
-  net,
   protocol,
   screen,
   session,
-  shell,
   type MenuItemConstructorOptions,
 } from 'electron';
 import { APP_ORIGIN, BACKUP_CHANNEL, type BackupResponse } from './api';
+import { isAllowedRequest, isAppUrl, mimeType, SECURITY_HEADERS } from './network';
 import { resolveAppPath } from './appProtocol';
 import { backupStatus, backupTextError, saveAutoBackup } from './backups';
 import {
@@ -35,6 +34,8 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 app.setAppUserModelId('sv.mi-lab.app');
+// Every renderer runs in the Chromium sandbox, whatever its webPreferences say.
+app.enableSandbox();
 
 let mainWindow: BrowserWindow | undefined;
 
@@ -72,14 +73,6 @@ function writeWindowState(window: BrowserWindow): void {
   }
 }
 
-function isAppUrl(url: string): boolean {
-  try {
-    return new URL(url).origin === APP_ORIGIN;
-  } catch {
-    return false;
-  }
-}
-
 function start(): void {
   const root = join(app.getAppPath(), BUILD_DIR);
 
@@ -88,15 +81,30 @@ function start(): void {
     const relative = url.host === 'mi-lab' ? resolveAppPath(url.pathname) : null;
     if (!relative) return new Response('Not found', { status: 404 });
     const file = join(root, relative);
-    if (!file.startsWith(root)) {
+    if (!file.startsWith(root + sep)) {
       return new Response('Not found', { status: 404 });
     }
+    const type = mimeType(relative);
+    if (!type) return new Response('Not found', { status: 404 });
     try {
-      return await net.fetch(pathToFileURL(file).toString());
+      // Read straight from the (asar) build folder: no file:// request exists for the page, so
+      // the network filter below can refuse every file: URL.
+      const body = await readFile(file);
+      // The CSP also travels as a header, which (unlike the <meta>) covers frame-ancestors.
+      return new Response(body, {
+        status: 200,
+        headers: { 'Content-Type': type, ...SECURITY_HEADERS },
+      });
     } catch {
       return new Response('Not found', { status: 404 });
     }
   });
+
+  // Offline by design: the page may only load its own files. Any http(s), ws(s), ftp or file
+  // request (a bug, an injected script or a link) is cancelled before it leaves the machine.
+  session.defaultSession.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) =>
+    callback({ cancel: !isAllowedRequest(details.url) }),
+  );
 
   // The app needs no permission (camera, location, notifications…): deny every request.
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) =>
@@ -136,18 +144,19 @@ function start(): void {
   createWindow();
 }
 
-/** The page may not navigate away from the app; web links open in the user's browser instead. */
+/**
+ * The page may not leave the app: no new windows, no navigation or redirect to another origin and
+ * no <webview>. Links to the web are not opened in the browser either (the app has none, and an
+ * isolated lab machine should not be steered to outside sites).
+ */
 function hardenWebContents(): void {
   app.on('web-contents-created', (_event, contents) => {
-    contents.setWindowOpenHandler(({ url }) => {
-      if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
-      return { action: 'deny' };
-    });
-    contents.on('will-navigate', (event, url) => {
-      if (isAppUrl(url)) return;
-      event.preventDefault();
-      if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
-    });
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    const stayInApp = (event: { preventDefault(): void }, url: string) => {
+      if (!isAppUrl(url)) event.preventDefault();
+    };
+    contents.on('will-navigate', stayInApp);
+    contents.on('will-redirect', stayInApp);
     contents.on('will-attach-webview', (event) => event.preventDefault());
   });
 }
@@ -207,6 +216,10 @@ function createWindow(): void {
       sandbox: true,
       webSecurity: true,
       webviewTag: false,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: false,
+      navigateOnDragDrop: false,
+      safeDialogs: true,
       // Developer tools only when running from source, never in the installed app.
       devTools: !app.isPackaged,
     },
