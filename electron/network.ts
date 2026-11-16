@@ -87,3 +87,21 @@ const MIME_TYPES: Readonly<Record<string, string>> = {
 export function mimeType(relativePath: string): string | undefined {
   return MIME_TYPES[posix.extname(relativePath).toLowerCase()];
 }
+
+/**
+ * Command-line switches that would let another program drive or inspect the installed app
+ * (Chrome DevTools Protocol over a port or pipe, V8 flags). The Node --inspect switches are
+ * already disabled by the fuses; these are Chromium's.
+ */
+export const FORBIDDEN_SWITCHES = [
+  'remote-debugging-port',
+  'remote-debugging-pipe',
+  'remote-debugging-address',
+  'remote-allow-origins',
+  'js-flags',
+] as const;
+
+/** The first forbidden switch present, if any. */
+export function forbiddenSwitch(hasSwitch: (name: string) => boolean): string | undefined {
+  return FORBIDDEN_SWITCHES.find((name) => hasSwitch(name));
+}

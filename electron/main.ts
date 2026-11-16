@@ -12,7 +12,7 @@ import {
   type MenuItemConstructorOptions,
 } from 'electron';
 import { APP_ORIGIN, BACKUP_CHANNEL, type BackupResponse } from './api';
-import { isAllowedRequest, isAppUrl, mimeType, SECURITY_HEADERS } from './network';
+import { forbiddenSwitch, isAllowedRequest, isAppUrl, mimeType, SECURITY_HEADERS } from './network';
 import { resolveAppPath } from './appProtocol';
 import { backupStatus, backupTextError, saveAutoBackup } from './backups';
 import {
@@ -26,6 +26,12 @@ import {
 const APP_NAME = 'Mi-lab';
 const SCHEME = 'app';
 const BUILD_DIR = 'dist-desktop';
+
+// The installed app refuses to start with remote debugging (DevTools protocol) switches: nothing
+// else on the machine may drive it. Source runs (`pnpm run desktop`) keep them for testing.
+if (app.isPackaged && forbiddenSwitch((name) => app.commandLine.hasSwitch(name))) {
+  app.exit(1);
+}
 
 // Must run before `ready`. `standard` + `secure` give the page a real origin (app://mi-lab), so
 // localStorage persists, `'self'` in the CSP matches and fetch/module scripts behave as on https.
@@ -99,6 +105,11 @@ function start(): void {
       return new Response('Not found', { status: 404 });
     }
   });
+
+  // Chromium's spell checker downloads dictionaries from Google on first use: turn it off and
+  // point the download URL nowhere, so the app never talks to the network by itself.
+  session.defaultSession.setSpellCheckerEnabled(false);
+  session.defaultSession.setSpellCheckerDictionaryDownloadURL('app://mi-lab/no-dictionaries/');
 
   // Offline by design: the page may only load its own files. Any http(s), ws(s), ftp or file
   // request (a bug, an injected script or a link) is cancelled before it leaves the machine.
@@ -220,6 +231,7 @@ function createWindow(): void {
       experimentalFeatures: false,
       navigateOnDragDrop: false,
       safeDialogs: true,
+      spellcheck: false,
       // Developer tools only when running from source, never in the installed app.
       devTools: !app.isPackaged,
     },

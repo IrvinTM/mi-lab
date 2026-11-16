@@ -56,6 +56,9 @@ datos de pacientes.** Amenazas consideradas:
 | S10 | Baja     | La CSP de escritorio solo iba en `<meta>` (no admite `frame-ancestors`)                                                                                                                                               | **Corregido**: se envía también como cabecera, con `frame-ancestors 'none'`, `nosniff`, COOP/CORP y `no-referrer`                                    |
 | S11 | Baja     | Comprobación de ruta con `startsWith(root)` (aceptaría una carpeta hermana `dist-desktop-x`)                                                                                                                          | **Corregido**: `root + sep`; además solo se sirven tipos de archivo conocidos                                                                        |
 | S12 | Baja     | Se aceptaban redirecciones fuera de la app (`will-redirect` no se revisaba)                                                                                                                                           | **Corregido**                                                                                                                                        |
+| S13 | Media    | **Fuga de red**: el corrector ortográfico de Chromium descargaba diccionarios de Google al abrir la app (detectado midiendo el tráfico)                                                                               | **Corregido**: corrector desactivado y URL de descarga anulada; medición posterior: 0 paquetes                                                       |
+| S14 | Media    | `Mi-lab.exe --remote-debugging-port=…` permitía que otro programa controlara la app por el protocolo DevTools                                                                                                         | **Corregido**: la app instalada se cierra al arrancar con esos interruptores (probado)                                                               |
+| S15 | Baja     | electron-builder incluía `app-update.yml` (canal de actualización a GitHub) y `elevate.exe` sin usarlos                                                                                                               | **Corregido**: `publish: null`, `packElevateHelper: false`                                                                                           |
 
 Ya estaban bien (revisado): `contextIsolation`, `sandbox`, `nodeIntegration: false`,
 `webSecurity`, sin `<webview>`, permisos denegados (cámara, ubicación, notificaciones…), una sola
@@ -103,12 +106,29 @@ La app no abre puertos, así que "estar expuesta a internet" depende del equipo,
 ## Cómo se verificó
 
 - `pnpm audit` (todas las dependencias): 0 vulnerabilidades.
-- `pnpm run check`: 993 pruebas, incluidas las de `electron/network.test.ts` (aislamiento de red,
-  origen de la app, CSP igual a la del build web, tipos de archivo).
-- `electron-builder --win --dir` en Linux y lectura de los fusibles del `Mi-lab.exe` generado con
-  `@electron/fuses`: los 8 fusibles en el estado esperado.
+- `pnpm run check`: 994 pruebas, incluidas las de `electron/network.test.ts` (aislamiento de red,
+  origen de la app, CSP igual a la del build web, tipos de archivo, interruptores de depuración).
+- **Prueba de humo en ejecución** (`scripts/desktop-smoke.mjs`, por el protocolo DevTools) con la
+  app en Linux bajo Xvfb: 28 comprobaciones — carga en `app://mi-lab`, sin Node en la página,
+  respaldo automático por IPC (y rechazo de JSON inválido), peticiones a internet, a la red local
+  y a `file:` bloqueadas **también con la CSP desactivada** (filtro del proceso principal), CSP
+  como cabecera, `..` y tipos desconocidos → 404, `window.open` y navegación externa bloqueados,
+  rutas profundas con F5, `localStorage` persistente, carga diferida, y flujo real (crear área y
+  producto desde la interfaz, recargar, siguen ahí). Sin errores de consola.
+- **Tráfico de salida medido**: la app corrió con un usuario propio y reglas de `iptables` que
+  cuentan y bloquean todo paquete de ese usuario (validadas antes con `curl`): **0 paquetes y 0
+  consultas DNS** durante la prueba y 30 s de reposo. Esta medición encontró la fuga S13.
+- Ejecutable empaquetado (Linux, misma configuración): arranca y muestra la interfaz; con
+  `--remote-debugging-port` se cierra en 1 s sin abrir el puerto.
+- **`Mi-lab.exe` de Windows (el del CI) en Wine**: arranca, pasa la verificación de integridad
+  del `app.asar`, sirve la página por `app://`, el puente de respaldo responde con la ruta
+  `C:\users\…\Documents\Mi-lab\Respaldos`, `fetch` a internet bloqueado, CSP como cabecera.
+  Wine no logra dibujar la interfaz de Chromium 45 (fallo de página dentro de Wine), por eso:
+- **En el CI de Windows** (cada compilación): la misma prueba de humo sobre Windows real, el
+  `Mi-lab.exe` empaquetado debe abrir una ventana con el título de la página y negarse a arrancar
+  con `--remote-debugging-port`, y el instalador se instala en silencio, la app instalada abre y
+  el desinstalador la quita **conservando los datos**.
+- Lectura de los fusibles del `Mi-lab.exe` con `@electron/fuses`: los 8 en el estado esperado.
 
-**No verificado** (no hay Windows ni interfaz gráfica en el equipo de desarrollo): abrir la app
-instalada, que la verificación de integridad del `app.asar` arranque bien en Windows real (si
-fallara, la app se cerraría al abrir: es lo primero que hay que probar), el filtro de red en
-ejecución, el diálogo "Guardar como" y el respaldo automático en `Documentos`.
+**No verificado automáticamente:** el asistente del instalador en pantalla (en español), el aviso
+de SmartScreen, el diálogo "Guardar como" de las descargas y la apariencia en monitores reales.

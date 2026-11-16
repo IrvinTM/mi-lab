@@ -13,6 +13,9 @@ files:
   - package.json
   - '!node_modules'
 asar: true
+# No auto-update: without this electron-builder writes resources/app-update.yml pointing at the
+# GitHub repo (the app does not use it, but nothing should suggest an update channel).
+publish: null
 # Electron fuses (flipped in the binary at build time, cannot be changed by config or env):
 # the installed Mi-lab.exe cannot be used as a Node.js interpreter, ignores NODE_OPTIONS and
 # --inspect, only runs the code inside its own app.asar and refuses an altered app.asar.
@@ -50,3 +53,5 @@ nsis:
     - es_ES
   # The data lives in %APPDATA%\Mi-lab and Documents\Mi-lab: uninstalling must keep both.
   deleteAppDataOnUninstall: false
+  # Per-user install: the elevation helper is never needed.
+  packElevateHelper: false

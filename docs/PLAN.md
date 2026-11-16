@@ -763,7 +763,9 @@ librería va con `import()`); el informe usa las mismas derivaciones que la pant
 - [x] **T9.3** Auditoría de seguridad (`docs/SEGURIDAD.md`): fusibles de Electron, aislamiento de
   red en el proceso principal, sin enlaces externos, CSP también como cabecera, dependencias con
   versión exacta y 3 días de antigüedad mínima, `pnpm audit` y acciones fijadas por hash en CI,
-  suma SHA-256 del instalador. Pendiente: firma de código y prueba en un Windows real.
+  suma SHA-256 del instalador; sin corrector ortográfico (descargaba de Google), sin depuración
+  remota en la app instalada; prueba de humo (`scripts/desktop-smoke.mjs`) y del instalador en el
+  CI de Windows. Pendiente: firma de código.
 
 ## 11. Protocolo para agentes
 

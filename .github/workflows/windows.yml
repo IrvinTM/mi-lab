@@ -40,6 +40,69 @@ jobs:
           # The installer is not code-signed yet.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
+      # Real Windows checks (docs/SEGURIDAD.md). 1) The app from source, driven over the DevTools
+      # protocol: pages, routes, reload, localStorage, backups (IPC), network blocked, CSP, UI flow.
+      - name: Prueba de humo (código fuente, DevTools)
+        shell: pwsh
+        run: |
+          # require('electron') returns the binary path (downloading it on first use).
+          $electron = (node -e "console.log(require('electron'))" | Select-Object -Last 1).Trim()
+          $app = Start-Process -PassThru -FilePath $electron -ArgumentList '.', '--remote-debugging-port=9333'
+          try { node scripts/desktop-smoke.mjs 9333; if ($LASTEXITCODE -ne 0) { exit 1 } }
+          finally { Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue }
+
+      # 2) The packaged Mi-lab.exe (fuses + asar integrity): it must open a window whose title
+      # comes from the page ("… · Mi-lab"), so the renderer loaded; and it must refuse to start
+      # with a remote-debugging switch.
+      - name: Prueba del ejecutable empaquetado
+        shell: pwsh
+        run: |
+          $exe = 'release/win-unpacked/Mi-lab.exe'
+          Get-Process Mi-lab, electron -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 2
+          $p = Start-Process -PassThru -FilePath $exe
+          $title = ''
+          for ($i = 0; $i -lt 60 -and -not ($title -like '*Mi-lab*' -and $title -ne 'Mi-lab'); $i++) {
+            Start-Sleep -Seconds 1
+            $title = (Get-Process -Id $p.Id -ErrorAction SilentlyContinue).MainWindowTitle
+            if ($p.HasExited) { throw "Mi-lab.exe se cerró al abrir (código $($p.ExitCode))" }
+          }
+          Write-Host "Título de la ventana: $title"
+          Get-Process Mi-lab -ErrorAction SilentlyContinue | Stop-Process -Force
+          if (-not ($title -like '* · Mi-lab')) { throw 'La página no cargó en el ejecutable empaquetado' }
+          Start-Sleep -Seconds 2
+          $d = Start-Process -PassThru -FilePath $exe -ArgumentList '--remote-debugging-port=9444'
+          if (-not $d.WaitForExit(20000)) { Stop-Process -Id $d.Id -Force; throw 'Arrancó con --remote-debugging-port' }
+          Write-Host "Con --remote-debugging-port se cerró con código $($d.ExitCode)"
+
+      # 3) The installer: silent per-user install, the installed app opens, silent uninstall keeps
+      # the user's data.
+      - name: Prueba del instalador
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem release/Mi-lab-Setup-*.exe).FullName
+          $i = Start-Process -PassThru -Wait -FilePath $setup -ArgumentList '/S'
+          if ($i.ExitCode -ne 0) { throw "El instalador terminó con código $($i.ExitCode)" }
+          $installed = Join-Path $env:LOCALAPPDATA 'Programs/Mi-lab/Mi-lab.exe'
+          if (-not (Test-Path $installed)) { throw "No se encontró $installed" }
+          $p = Start-Process -PassThru -FilePath $installed
+          $title = ''
+          for ($n = 0; $n -lt 60 -and -not ($title -like '* · Mi-lab'); $n++) {
+            Start-Sleep -Seconds 1
+            $title = (Get-Process -Id $p.Id -ErrorAction SilentlyContinue).MainWindowTitle
+          }
+          Get-Process Mi-lab -ErrorAction SilentlyContinue | Stop-Process -Force
+          if (-not ($title -like '* · Mi-lab')) { throw 'La app instalada no abrió la ventana' }
+          $data = Join-Path $env:APPDATA 'Mi-lab'
+          if (-not (Test-Path $data)) { throw "No se creó $data" }
+          Start-Sleep -Seconds 2
+          $uninstaller = Join-Path $env:LOCALAPPDATA 'Programs/Mi-lab/Uninstall Mi-lab.exe'
+          $u = Start-Process -PassThru -Wait -FilePath $uninstaller -ArgumentList '/S'
+          Start-Sleep -Seconds 5
+          if (Test-Path $installed) { throw 'El desinstalador no quitó la app' }
+          if (-not (Test-Path $data)) { throw 'El desinstalador borró los datos del usuario' }
+          Write-Host "Instalación, apertura y desinstalación correctas; datos conservados en $data"
+
       - name: Suma SHA-256 del instalador
         shell: pwsh
         run: |

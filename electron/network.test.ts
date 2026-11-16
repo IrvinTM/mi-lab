@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   CONTENT_SECURITY_POLICY,
+  forbiddenSwitch,
   isAllowedRequest,
   isAppUrl,
   mimeType,
@@ -69,5 +70,14 @@ describe('desktop network isolation', () => {
     expect(mimeType('favicon.svg')).toBe('image/svg+xml');
     expect(mimeType('payload.exe')).toBeUndefined();
     expect(mimeType('noext')).toBeUndefined();
+  });
+
+  it('detects remote-debugging switches', () => {
+    const has = (present: string[]) => (name: string) => present.includes(name);
+    expect(forbiddenSwitch(has([]))).toBeUndefined();
+    expect(forbiddenSwitch(has(['lang']))).toBeUndefined();
+    expect(forbiddenSwitch(has(['remote-debugging-port']))).toBe('remote-debugging-port');
+    expect(forbiddenSwitch(has(['remote-debugging-pipe']))).toBe('remote-debugging-pipe');
+    expect(forbiddenSwitch(has(['js-flags']))).toBe('js-flags');
   });
 });
