@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { ToastProvider } from '@/ui';
 import type { InventoryData } from '@/domain/types';
+import { useAutoBackupStatus } from '@/state/autoBackup';
 import { useInventoryStore } from '@/state/store';
 import { installDialogPolyfill } from '@/test/dialog-polyfill';
 import { sampleData } from '@/test/fixtures';
@@ -164,6 +165,43 @@ describe('SettingsPage', () => {
       expect(screen.getByLabelText('Fecha simulada')).toHaveValue('2026-12-25');
       await user.clear(screen.getByLabelText('Fecha simulada'));
       expect(settings().todayOverride).toBeUndefined();
+    });
+  });
+
+  describe('automatic backup (desktop)', () => {
+    afterEach(() => {
+      delete window.miLabDesktop;
+      useAutoBackupStatus.setState({ status: undefined, error: undefined });
+    });
+
+    it('is not shown in the browser', () => {
+      renderPage();
+      expect(screen.queryByText('Respaldo automático')).not.toBeInTheDocument();
+      expect(screen.getByText(/solo en este navegador/)).toBeInTheDocument();
+    });
+
+    it('shows the folder and the date of the last copy in the desktop app', () => {
+      window.miLabDesktop = { backup: vi.fn() };
+      useAutoBackupStatus.setState({
+        status: {
+          dir: 'C:\\Users\\Ana\\Documents\\Mi-lab\\Respaldos',
+          lastFile: 'x.json',
+          lastSavedAt: '2026-11-15T15:30:00.000Z',
+        },
+      });
+      renderPage();
+      expect(screen.getByText('Respaldo automático')).toBeInTheDocument();
+      expect(screen.getByText(/Mi-lab\\Respaldos/)).toBeInTheDocument();
+      expect(screen.getByText(/Último respaldo automático: .*2026/)).toBeInTheDocument();
+      expect(screen.getByText(/solo en este equipo/)).toBeInTheDocument();
+    });
+
+    it('says so when there is no copy yet, and shows an error', () => {
+      window.miLabDesktop = { backup: vi.fn() };
+      useAutoBackupStatus.setState({ error: 'No se pudo guardar el respaldo automático.' });
+      renderPage();
+      expect(screen.getByText(/todavía no hay ninguno/)).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('No se pudo guardar');
     });
   });
 

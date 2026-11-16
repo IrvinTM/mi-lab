@@ -1,0 +1,40 @@
+# Windows installer (NSIS). Run via `pnpm run dist:win` or in CI (.github/workflows/windows.yml).
+appId: sv.mi-lab.app
+productName: Mi-lab
+copyright: Mi-lab
+directories:
+  output: release
+  buildResources: build
+# The app only needs the compiled page and the main process: no node_modules (React and friends
+# are already bundled into dist-desktop by Vite).
+files:
+  - dist-desktop/**
+  - dist-electron/**
+  - package.json
+  - '!node_modules'
+asar: true
+electronLanguages:
+  - es
+  - es-419
+win:
+  target:
+    - target: nsis
+      arch: x64
+  icon: build/icon.png
+  # Not signed yet (see docs/INSTALACION.md): Windows SmartScreen shows a warning on first run.
+  signAndEditExecutable: true
+nsis:
+  artifactName: Mi-lab-Setup-${version}.exe
+  oneClick: false
+  perMachine: false # per user: no administrator needed
+  allowElevation: false
+  allowToChangeInstallationDirectory: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Mi-lab
+  runAfterFinish: true
+  language: '3082' # Spanish
+  installerLanguages:
+    - es_ES
+  # The data lives in %APPDATA%\Mi-lab and Documents\Mi-lab: uninstalling must keep both.
+  deleteAppDataOnUninstall: false

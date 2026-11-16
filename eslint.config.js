@@ -5,8 +5,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 /** `import` patterns a layer may not use (PLAN §5: features → ui, state, domain, lib · …). */
-const layer = (...names) =>
-  names.flatMap((name) => [`@/${name}`, `@/${name}/*`, `**/${name}/*`]);
+const layer = (...names) => names.flatMap((name) => [`@/${name}`, `@/${name}/*`, `**/${name}/*`]);
 const REACT = ['react', 'react-dom', 'react-dom/*', 'react-router', 'zustand', 'lucide-react'];
 
 function restrictImports(files, patterns, message) {
@@ -18,7 +17,7 @@ function restrictImports(files, patterns, message) {
 }
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage'] },
+  { ignores: ['dist', 'dist-desktop', 'dist-electron', 'release', 'coverage'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],
@@ -28,6 +27,11 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
+  },
+  // Electron main process and preload (Node, not the browser).
+  {
+    files: ['electron/**/*.ts'],
+    languageOptions: { globals: globals.node },
   },
   // Dependency rule (PLAN §5). Tests may import anything to set up their data.
   restrictImports(

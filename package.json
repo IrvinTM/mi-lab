@@ -1,7 +1,11 @@
 {
   "name": "mi-lab",
+  "productName": "Mi-lab",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Control de inventario de reactivos de laboratorio clínico",
+  "author": "Mi-lab",
+  "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,7 +17,12 @@
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
     "check": "pnpm run typecheck && pnpm run lint && pnpm run test",
-    "perf": "PERF=1 vitest run"
+    "perf": "PERF=1 vitest run",
+    "build:electron": "tsc -p electron/tsconfig.build.json && node scripts/commonjs-marker.mjs",
+    "build:desktop": "tsc -b && vite build --outDir dist-desktop --emptyOutDir && pnpm run build:electron",
+    "desktop": "pnpm run build:desktop && electron .",
+    "dist:win": "pnpm run build:desktop && electron-builder --win --publish never",
+    "icon": "node scripts/make-icon.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3",
@@ -34,6 +43,8 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0",
     "eslint": "^9.39.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",

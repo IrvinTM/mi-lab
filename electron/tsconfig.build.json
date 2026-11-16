@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "../dist-electron",
+    "rootDir": ".",
+    "types": ["node"],
+    "tsBuildInfoFile": null,
+    "incremental": false
+  },
+  "include": ["."],
+  "exclude": ["**/*.test.ts"]
+}

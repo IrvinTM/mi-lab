@@ -1,7 +1,13 @@
 import { migrate } from '@/data/migrate';
+import type { InventoryData } from '@/domain/types';
 
 /** Largest backup file accepted. A ×10 inventory is ≈ 4 MB; anything far bigger is not ours. */
 export const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
+
+/** The text of a backup file (download and automatic copies share it). */
+export function serializeBackup(data: InventoryData): string {
+  return JSON.stringify(data, null, 2);
+}
 
 export type BackupCheck = { ok: true; json: unknown } | { ok: false; error: string };
 

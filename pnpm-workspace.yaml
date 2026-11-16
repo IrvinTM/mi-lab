@@ -1,3 +1,6 @@
 minimumReleaseAgeExclude:
   - '@testing-library/user-event@14.6.10'
   - prettier@3.10.1
+# electron-winstaller (Squirrel) is only pulled in by electron-builder; the NSIS installer does not use it.
+allowBuilds:
+  electron-winstaller: false
