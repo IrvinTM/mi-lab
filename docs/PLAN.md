@@ -756,7 +756,6 @@ librería va con `import()`); el informe usa las mismas derivaciones que la pant
 - [x] **T9.1** Inicio vacío: sin datos guardados, `pnpm run build` arranca sin inventario; solo con
   `VITE_DEMO_DATA=1` (`pnpm dev`, tests y `pnpm run build:demo`) se carga el seed. Restablecer
   pasa a "Borrar todos los datos" en modo vacío; estados vacíos con guía de primeros pasos.
-
 - [x] **T9.2** Instalador de Windows (Electron): proceso principal en `electron/`, instalador NSIS
   con electron-builder, respaldo automático diario en `Documentos\Mi-lab\Respaldos`, CI en
   `.github/workflows/windows.yml` y guía en `docs/INSTALACION.md`. Pendiente de verificar a mano en
