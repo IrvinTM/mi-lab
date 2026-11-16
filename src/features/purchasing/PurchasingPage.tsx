@@ -6,6 +6,8 @@ import { usePurchaseList } from '@/state/selectors';
 import type { ProductRow } from '@/state/derive';
 import { EmptyState, List, ListRow, PageHeader, Stat, Table, type TableColumn } from '@/ui';
 import { PageActions } from '../shared/PageActions';
+import { SetupGuide } from '../shared/SetupGuide';
+import { useIsEmptyInventory } from '../shared/useIsEmptyInventory';
 import { ReorderBadge } from '../shared/StatusBadges';
 import { useMediaQuery } from '../shared/useMediaQuery';
 
@@ -181,6 +183,7 @@ function Section({
 export function PurchasingPage() {
   const rows = usePurchaseList();
   const wide = useMediaQuery('(min-width: 900px)', false);
+  const noProducts = useIsEmptyInventory();
 
   const { toBuy, toConfigure, outCount } = useMemo(() => {
     const buy = rows.filter(
@@ -196,7 +199,9 @@ export function PurchasingPage() {
   return (
     <>
       <PageHeader title="Compras" actions={<PageActions />} />
-      {toBuy.length === 0 && toConfigure.length === 0 ? (
+      {noProducts ? (
+        <SetupGuide />
+      ) : toBuy.length === 0 && toConfigure.length === 0 ? (
         <EmptyState icon={ShoppingCart} title="No hay nada por comprar">
           Todos los productos tienen existencias suficientes para el consumo previsto.
         </EmptyState>

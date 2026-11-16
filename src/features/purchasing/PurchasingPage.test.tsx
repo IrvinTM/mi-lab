@@ -144,10 +144,10 @@ describe('PurchasingPage (desktop)', () => {
     expect(link).toHaveAttribute('href', '/productos/p4');
   });
 
-  it('shows an empty state when nothing needs buying or configuring', () => {
+  it('guides the first steps when there are no products', () => {
     const data = purchaseData();
     renderPage({ ...data, products: [], lots: [], movements: [] });
-    expect(screen.getByText('No hay nada por comprar')).toBeInTheDocument();
+    expect(screen.getByText(/Empieza creando un área en Ajustes/)).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 

@@ -56,6 +56,8 @@ export interface InventoryState {
   /** Why loading failed (stored data unreadable) or the last save failed. */
   loadError?: string;
   saveError?: string;
+  /** Whether this build offers the sample data (first run and reset). Off in production. */
+  demoData: boolean;
   data: InventoryData;
 
   init(): Promise<void>;
@@ -85,6 +87,8 @@ export interface InventoryState {
   updateSettings(patch: Partial<Settings>): void;
   /** Async: the demo data is its own chunk, downloaded only when needed. */
   resetToSeed(): Promise<void>;
+  /** Deletes everything and leaves the app empty (the production reset). */
+  resetToEmpty(): void;
   importBackup(json: unknown): { ok: boolean; error?: string };
 }
 
@@ -93,6 +97,8 @@ export interface StoreOptions {
   now?: () => Date;
   /** Milliseconds to wait after the last change before saving. Default 300. */
   debounceMs?: number;
+  /** Load the sample data on the first run and offer it on reset. Default: `VITE_DEMO_DATA === '1'`. */
+  demoData?: boolean;
 }
 
 /** The demo data is only needed on the first visit or on reset, so it stays out of the initial bundle. */
@@ -153,6 +159,7 @@ export function createInventoryStore(repository: InventoryRepository, options: S
   const newId = options.newId ?? (() => randomId());
   const now = options.now ?? (() => new Date());
   const debounceMs = options.debounceMs ?? 300;
+  const demoData = options.demoData ?? import.meta.env.VITE_DEMO_DATA === '1';
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   let initPromise: Promise<void> | undefined;
@@ -174,6 +181,7 @@ export function createInventoryStore(repository: InventoryRepository, options: S
 
     return {
       status: 'loading',
+      demoData,
       data: emptyData(),
 
       init() {
@@ -185,7 +193,10 @@ export function createInventoryStore(repository: InventoryRepository, options: S
             if (stored) {
               set({ data: stored, status: 'ready' });
             } else {
-              set({ data: await loadSeed(todayISO(now())), status: 'ready' });
+              set({
+                data: demoData ? await loadSeed(todayISO(now())) : emptyData(),
+                status: 'ready',
+              });
               scheduleSave();
             }
           } catch (error) {
@@ -505,6 +516,10 @@ export function createInventoryStore(repository: InventoryRepository, options: S
 
       async resetToSeed() {
         replaceAll(await loadSeed(todayISO(now())));
+      },
+
+      resetToEmpty() {
+        replaceAll(emptyData());
       },
 
       importBackup(json) {

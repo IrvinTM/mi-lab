@@ -17,7 +17,8 @@ en el navegador.
 pnpm install        # instalar dependencias
 pnpm dev            # servidor de desarrollo
 pnpm run check      # typecheck + lint + tests
-pnpm run build      # build de producción
+pnpm run build      # build de producción (arranca vacía, sin datos de muestra)
+pnpm run build:demo # build con los datos de muestra (VITE_DEMO_DATA=1)
 pnpm test           # solo tests
 pnpm run perf       # tiempos de las derivaciones con datos ×10 (lento; no forma parte de check)
 ```

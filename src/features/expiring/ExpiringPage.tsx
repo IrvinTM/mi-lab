@@ -7,6 +7,8 @@ import { useExpiringLots } from '@/state/selectors';
 import { useInventoryStore } from '@/state/store';
 import { Button, Card, EmptyState, List, PageHeader, SegmentedControl } from '@/ui';
 import { PageActions } from '../shared/PageActions';
+import { SetupGuide } from '../shared/SetupGuide';
+import { useIsEmptyInventory } from '../shared/useIsEmptyInventory';
 import { useWriteOff, type WriteOffTarget } from '../shared/useWriteOff';
 import { ExpiryBadge } from '../shared/StatusBadges';
 
@@ -124,6 +126,7 @@ export function ExpiringPage() {
   };
 
   const empty = EMPTY_COPY[filter];
+  const noProducts = useIsEmptyInventory();
 
   return (
     <>
@@ -136,7 +139,9 @@ export function ExpiringPage() {
         className="mb-4 desktop:max-w-xl"
       />
 
-      {lots.length === 0 ? (
+      {lots.length === 0 && noProducts ? (
+        <SetupGuide />
+      ) : lots.length === 0 ? (
         <EmptyState icon={empty.icon} title={empty.title}>
           {empty.hint}
         </EmptyState>

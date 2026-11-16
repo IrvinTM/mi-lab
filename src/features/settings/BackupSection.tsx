@@ -20,6 +20,7 @@ type Confirmation = 'restore' | 'reset' | null;
 /** Download, restore and reset of the whole dataset. */
 export function BackupSection() {
   const toast = useToast();
+  const demoData = useInventoryStore((state) => state.demoData);
   const today = useToday();
   const fileInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string>();
@@ -75,9 +76,13 @@ export function BackupSection() {
 
   const reset = async () => {
     setConfirming(null);
-    await useInventoryStore.getState().resetToSeed();
+    if (demoData) {
+      await useInventoryStore.getState().resetToSeed();
+    } else {
+      useInventoryStore.getState().resetToEmpty();
+    }
     setError(undefined);
-    toast.show({ message: 'Datos demo restablecidos' });
+    toast.show({ message: demoData ? 'Datos demo restablecidos' : 'Datos borrados' });
   };
 
   const cancel = () => {
@@ -123,10 +128,12 @@ export function BackupSection() {
 
       <div className="flex flex-col gap-1">
         <Button variant="destructive" onClick={() => setConfirming('reset')}>
-          Restablecer datos demo
+          {demoData ? 'Restablecer datos demo' : 'Borrar todos los datos'}
         </Button>
         <p className="text-footnote text-label-secondary">
-          Borra tus datos y vuelve a cargar el inventario de ejemplo.
+          {demoData
+            ? 'Borra tus datos y vuelve a cargar el inventario de ejemplo.'
+            : 'Borra todo el inventario y deja la aplicación vacía. Descarga un respaldo antes.'}
         </p>
       </div>
 
@@ -142,9 +149,13 @@ export function BackupSection() {
       <Alert
         open={confirming === 'reset'}
         destructive
-        title="¿Restablecer los datos demo?"
-        message="Se borrarán todos los productos, lotes y movimientos actuales y se cargará el inventario de ejemplo. No se puede deshacer."
-        confirmLabel="Restablecer"
+        title={demoData ? '¿Restablecer los datos demo?' : '¿Borrar todos los datos?'}
+        message={
+          demoData
+            ? 'Se borrarán todos los productos, lotes y movimientos actuales y se cargará el inventario de ejemplo. No se puede deshacer.'
+            : 'Se perderán todos los productos, lotes, movimientos y ajustes, salvo que tengas un respaldo descargado. La aplicación quedará vacía. No se puede deshacer.'
+        }
+        confirmLabel={demoData ? 'Restablecer' : 'Borrar todo'}
         onCancel={cancel}
         onConfirm={() => void reset()}
       />

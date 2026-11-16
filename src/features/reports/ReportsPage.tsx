@@ -18,6 +18,8 @@ import {
   useToast,
 } from '@/ui';
 import { downloadBytes } from '../shared/download';
+import { SetupGuide } from '../shared/SetupGuide';
+import { useIsEmptyInventory } from '../shared/useIsEmptyInventory';
 
 type Mode = 'current' | 'previous' | 'month' | 'range';
 
@@ -112,6 +114,7 @@ export function ReportsPage() {
   const today = useToday();
   const data = useInventoryStore((state) => state.data);
   const toast = useToast();
+  const noProducts = useIsEmptyInventory();
   const [mode, setMode] = useState<Mode>('current');
   const [month, setMonth] = useState(today.slice(0, 7));
   const [from, setFrom] = useState(currentMonthRange(today).from);
@@ -149,65 +152,69 @@ export function ReportsPage() {
   return (
     <>
       <PageHeader title="Informes" />
-      <div className="flex flex-col gap-6">
-        <Card className="flex flex-col gap-4">
-          <SegmentedControl
-            label="Periodo"
-            options={MODES}
-            value={mode}
-            onChange={(next) => {
-              setMode(next);
-              setFailure(null);
-            }}
-          />
-          {mode === 'month' ? (
-            <TextField
-              label="Mes"
-              type="month"
-              value={month}
-              max={today.slice(0, 7)}
-              onChange={setMonth}
-              error={error}
+      {noProducts ? (
+        <SetupGuide title="Aún no hay nada que informar" />
+      ) : (
+        <div className="flex flex-col gap-6">
+          <Card className="flex flex-col gap-4">
+            <SegmentedControl
+              label="Periodo"
+              options={MODES}
+              value={mode}
+              onChange={(next) => {
+                setMode(next);
+                setFailure(null);
+              }}
             />
-          ) : null}
-          {mode === 'range' ? (
-            <div className="grid grid-cols-1 gap-3 sheet:grid-cols-2">
-              <DateField label="Desde" value={from} max={today} onChange={setFrom} />
-              <DateField label="Hasta" value={to} max={today} onChange={setTo} />
+            {mode === 'month' ? (
+              <TextField
+                label="Mes"
+                type="month"
+                value={month}
+                max={today.slice(0, 7)}
+                onChange={setMonth}
+                error={error}
+              />
+            ) : null}
+            {mode === 'range' ? (
+              <div className="grid grid-cols-1 gap-3 sheet:grid-cols-2">
+                <DateField label="Desde" value={from} max={today} onChange={setFrom} />
+                <DateField label="Hasta" value={to} max={today} onChange={setTo} />
+              </div>
+            ) : null}
+            {error && mode === 'range' ? (
+              <p role="alert" className="flex items-start gap-2 text-footnote text-danger">
+                <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                {error}
+              </p>
+            ) : null}
+          </Card>
+
+          {report ? <Summary report={report} /> : null}
+
+          <div className="flex flex-col gap-3">
+            <div>
+              <Button
+                icon={FileSpreadsheet}
+                loading={generating}
+                disabled={!report}
+                onClick={() => void download()}
+              >
+                {generating ? 'Generando…' : 'Descargar informe (Excel)'}
+              </Button>
             </div>
-          ) : null}
-          {error && mode === 'range' ? (
-            <p role="alert" className="flex items-start gap-2 text-footnote text-danger">
-              <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-              {error}
+            <p role="status" aria-live="polite" className="sr-only">
+              {generating ? 'Generando el informe…' : ''}
             </p>
-          ) : null}
-        </Card>
-
-        {report ? <Summary report={report} /> : null}
-
-        <div className="flex flex-col gap-3">
-          <div>
-            <Button
-              icon={FileSpreadsheet}
-              loading={generating}
-              disabled={!report}
-              onClick={() => void download()}
-            >
-              {generating ? 'Generando…' : 'Descargar informe (Excel)'}
-            </Button>
+            {failure ? (
+              <p role="alert" className="flex items-start gap-2 text-footnote text-danger">
+                <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                {failure}
+              </p>
+            ) : null}
           </div>
-          <p role="status" aria-live="polite" className="sr-only">
-            {generating ? 'Generando el informe…' : ''}
-          </p>
-          {failure ? (
-            <p role="alert" className="flex items-start gap-2 text-footnote text-danger">
-              <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-              {failure}
-            </p>
-          ) : null}
         </div>
-      </div>
+      )}
     </>
   );
 }

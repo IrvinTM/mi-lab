@@ -20,6 +20,7 @@ import {
 } from '@/ui';
 import { EditProductSheet } from '../shared/EditProductSheet';
 import { PageActions } from '../shared/PageActions';
+import { SetupGuide } from '../shared/SetupGuide';
 import { ExpiryBadge, ReorderBadge } from '../shared/StatusBadges';
 import {
   DEFAULT_SORT,
@@ -172,7 +173,9 @@ export function ProductsPage() {
   const [areaId, setAreaId] = useState('all');
   const [status, setStatus] = useState<StatusFilter>('all');
   const [sort, setSort] = useState<TableSort>(DEFAULT_SORT);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(
+    (location.state as { newProduct?: boolean } | null)?.newProduct === true,
+  );
 
   const focusSearch = (location.state as { focusSearch?: boolean } | null)?.focusSearch === true;
   useEffect(() => {
@@ -253,7 +256,11 @@ export function ProductsPage() {
         {visible.length === 1 ? '1 producto' : `${visible.length} productos`}
       </p>
 
-      {visible.length === 0 ? (
+      {visible.length === 0 && rows.length === 0 ? (
+        <div className="rounded-md bg-bg-elevated">
+          <SetupGuide />
+        </div>
+      ) : visible.length === 0 ? (
         <div className="rounded-md bg-bg-elevated">
           <EmptyState
             icon={PackageSearch}

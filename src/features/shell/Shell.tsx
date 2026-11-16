@@ -30,6 +30,7 @@ const SETTINGS_ITEM: NavItem = { to: '/ajustes', label: 'Ajustes', icon: Setting
 function LoadError({ message }: { message?: string }) {
   const [confirming, setConfirming] = useState(false);
   const today = useToday();
+  const demoData = useInventoryStore((state) => state.demoData);
   // Keep a copy of the unreadable data before resetting: it can still be repaired by hand.
   const downloadStored = async () => {
     const text = await useInventoryStore.getState().readStoredText();
@@ -46,7 +47,7 @@ function LoadError({ message }: { message?: string }) {
               Descargar datos guardados
             </Button>
             <Button variant="destructive" onClick={() => setConfirming(true)}>
-              Restablecer datos demo
+              {demoData ? 'Restablecer datos demo' : 'Borrar todos los datos'}
             </Button>
           </div>
         }
@@ -57,13 +58,18 @@ function LoadError({ message }: { message?: string }) {
       <Alert
         open={confirming}
         destructive
-        title="¿Restablecer los datos?"
-        message="Se reemplazarán los datos guardados en este navegador por los datos de demostración. Si quieres conservarlos, descárgalos antes."
-        confirmLabel="Restablecer"
+        title={demoData ? '¿Restablecer los datos?' : '¿Borrar todos los datos?'}
+        message={
+          demoData
+            ? 'Se reemplazarán los datos guardados en este navegador por los datos de demostración. Si quieres conservarlos, descárgalos antes.'
+            : 'Se perderán todos los datos guardados en este navegador, salvo que tengas un respaldo. La aplicación quedará vacía. Si quieres conservarlos, descarga los datos guardados antes.'
+        }
+        confirmLabel={demoData ? 'Restablecer' : 'Borrar todo'}
         onCancel={() => setConfirming(false)}
         onConfirm={() => {
           setConfirming(false);
-          void useInventoryStore.getState().resetToSeed();
+          if (demoData) void useInventoryStore.getState().resetToSeed();
+          else useInventoryStore.getState().resetToEmpty();
         }}
       />
     </main>

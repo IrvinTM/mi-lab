@@ -299,6 +299,24 @@ describe('SettingsPage', () => {
     });
   });
 
+  describe('without demo data (production)', () => {
+    afterEach(() => act(() => useInventoryStore.setState({ demoData: true })));
+
+    it('offers to delete everything, with a destructive warning, and leaves the app empty', async () => {
+      act(() => useInventoryStore.setState({ demoData: false }));
+      const user = userEvent.setup();
+      renderPage();
+      expect(screen.queryByRole('button', { name: /demo/i })).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Borrar todos los datos' }));
+      const alert = screen.getByRole('alertdialog', { name: '¿Borrar todos los datos?' });
+      expect(alert).toHaveTextContent(/salvo que tengas un respaldo/);
+      await user.click(within(alert).getByRole('button', { name: 'Borrar todo' }));
+      expect(useInventoryStore.getState().data.products).toHaveLength(0);
+      expect(useInventoryStore.getState().data.areas).toHaveLength(0);
+      expect(screen.getByText('Datos borrados')).toBeInTheDocument();
+    });
+  });
+
   describe('areas', () => {
     const areaRow = (name: string) =>
       screen.getByText(name, { selector: 'span' }).closest('li') as HTMLElement;

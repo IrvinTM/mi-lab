@@ -95,6 +95,18 @@ describe('Shell', () => {
     await waitFor(() => expect(useInventoryStore.getState().status).toBe('ready'));
     expect(useInventoryStore.getState().data.products.length).toBeGreaterThan(100);
   });
+
+  it('on a load error without demo data, offers to delete everything instead', async () => {
+    setStore({ status: 'error', loadError: 'Ilegible.', demoData: false });
+    const user = userEvent.setup();
+    renderApp('/');
+    expect(screen.queryByRole('button', { name: /demo/i })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Borrar todos los datos' }));
+    await user.click(await screen.findByRole('button', { name: 'Borrar todo' }));
+    await waitFor(() => expect(useInventoryStore.getState().status).toBe('ready'));
+    expect(useInventoryStore.getState().data.products).toHaveLength(0);
+    setStore({ demoData: true });
+  });
 });
 
 describe('Shell load error', () => {

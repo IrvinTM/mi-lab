@@ -97,6 +97,44 @@ describe('init and persistence', () => {
     expect((await repository.load())?.products.length).toBe(store.getState().data.products.length);
   });
 
+  it('starts empty on the first run when the demo data is off', async () => {
+    vi.useFakeTimers();
+    const repository = new MemoryRepository(null);
+    const store = createInventoryStore(repository, { now: () => NOW, demoData: false });
+    await store.getState().init();
+    const { data } = store.getState();
+    expect(store.getState().status).toBe('ready');
+    expect(store.getState().demoData).toBe(false);
+    expect([data.areas, data.fundingSources, data.products, data.lots, data.movements]).toEqual([
+      [],
+      [],
+      [],
+      [],
+      [],
+    ]);
+    expect(data.settings.labName).toBe('Laboratorio clínico');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(await repository.load()).toEqual(data); // saved, and valid for migrate()
+  });
+
+  it('keeps stored data even when the demo data is off', async () => {
+    const store = createInventoryStore(new MemoryRepository(twoProducts()), {
+      now: () => NOW,
+      demoData: false,
+    });
+    await store.getState().init();
+    expect(store.getState().data.products).toHaveLength(2);
+  });
+
+  it('resetToEmpty deletes everything and persists the empty data', async () => {
+    const { store, repository } = await readyStore();
+    store.getState().resetToEmpty();
+    expect(store.getState().data.products).toHaveLength(0);
+    expect(store.getState().data.movements).toHaveLength(0);
+    await store.getState().flush();
+    expect((await repository.load())?.products).toHaveLength(0);
+  });
+
   it('runs init once even if called twice (StrictMode)', async () => {
     const repository = new MemoryRepository(sampleData());
     const load = vi.spyOn(repository, 'load');
