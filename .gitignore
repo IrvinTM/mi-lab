@@ -1,6 +1,9 @@
 # Dependencies and build output
 node_modules
 dist
+dist-desktop
+dist-electron
+release
 coverage
 *.tsbuildinfo
 

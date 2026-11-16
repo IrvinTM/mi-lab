@@ -19,6 +19,8 @@ salidas FEFO (sale primero lo que vence primero) y sugerencias de compra.
 
 - Gestor de paquetes: **pnpm** (no uses `npm` ni `yarn`; no crees `package-lock.json`). Comandos:
   `pnpm install`, `pnpm dev`, `pnpm run check`, `pnpm run build`, `pnpm add [-D] <pkg>`.
+  Escritorio (Electron, código en `electron/`, no importa de `src/`): `pnpm run build:desktop`,
+  `pnpm run desktop`, `pnpm run dist:win` (instalador, ver `docs/INSTALACION.md`).
 - Stack: React + Vite + TypeScript estricto, Zustand, Tailwind CSS v4, Vitest. No agregues
   dependencias que no estén en PLAN §4 sin registrarlas ahí con su motivo.
 - Código, nombres y comentarios en **inglés**; todo texto visible en **español** (es-SV).

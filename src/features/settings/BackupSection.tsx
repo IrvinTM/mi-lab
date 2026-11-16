@@ -1,5 +1,6 @@
 import { useRef, useState, type ChangeEvent } from 'react';
-import { backupFileError, checkBackup } from '@/state/backup';
+import { isDesktop, useAutoBackupStatus } from '@/state/autoBackup';
+import { backupFileError, checkBackup, serializeBackup } from '@/state/backup';
 import { useToday } from '@/state/selectors';
 import { useInventoryStore } from '@/state/store';
 import { Alert, Button, useToast } from '@/ui';
@@ -15,10 +16,42 @@ function readText(file: File): Promise<string> {
   });
 }
 
+function formatSavedAt(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : date.toLocaleString('es-SV', { dateStyle: 'long', timeStyle: 'short' });
+}
+
+/** Desktop app only: where the automatic daily copies go and when the last one was made. */
+function AutoBackupInfo() {
+  const { status, error } = useAutoBackupStatus();
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-body text-label">Respaldo automático</p>
+      <p className="text-footnote text-label-secondary">
+        Cada día con cambios se guarda una copia en{' '}
+        <span className="break-all">{status?.dir ?? 'Documentos\\Mi-lab\\Respaldos'}</span> (se
+        conservan las últimas 30).
+      </p>
+      <p className="text-footnote text-label-secondary">
+        Último respaldo automático:{' '}
+        {status?.lastSavedAt ? formatSavedAt(status.lastSavedAt) : 'todavía no hay ninguno'}
+      </p>
+      {error ? (
+        <p role="alert" className="text-footnote text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 type Confirmation = 'restore' | 'reset' | null;
 
 /** Download, restore and reset of the whole dataset. */
 export function BackupSection() {
+  const desktop = isDesktop();
   const toast = useToast();
   const today = useToday();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -28,7 +61,7 @@ export function BackupSection() {
 
   const download = () => {
     const { data } = useInventoryStore.getState();
-    downloadText(JSON.stringify(data, null, 2), `mi-lab-respaldo-${today}.json`);
+    downloadText(serializeBackup(data), `mi-lab-respaldo-${today}.json`);
     setError(undefined);
     toast.show({ message: 'Respaldo descargado' });
   };
@@ -88,8 +121,13 @@ export function BackupSection() {
   return (
     <SettingsSection
       title="Respaldo"
-      footer="Los datos se guardan solo en este navegador. Descarga un respaldo con regularidad para no perderlos."
+      footer={
+        desktop
+          ? 'Los datos se guardan solo en este equipo. Además del respaldo automático, guarda una copia en una memoria USB con regularidad.'
+          : 'Los datos se guardan solo en este navegador. Descarga un respaldo con regularidad para no perderlos.'
+      }
     >
+      {desktop ? <AutoBackupInfo /> : null}
       <div className="flex flex-col gap-1">
         <Button variant="tinted" onClick={download}>
           Descargar respaldo (JSON)
