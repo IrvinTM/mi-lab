@@ -120,8 +120,9 @@ function small(): InventoryData {
 
 let dir: string;
 let file: string;
-const opened: InventoryDb[] = [];
-const open = (path = file) => {
+/** Everything a test opens is closed after it: Windows cannot delete an open database file. */
+const opened: { close(): void }[] = [];
+const open = (path = file): InventoryDb => {
   const db = openInventoryDb(path);
   opened.push(db);
   return db;
@@ -132,13 +133,20 @@ beforeEach(async () => {
   file = join(dir, 'mi-lab.db');
 });
 afterEach(async () => {
-  for (const db of opened.splice(0)) db.close();
+  for (const db of opened.splice(0)) {
+    try {
+      db.close();
+    } catch {
+      // Already closed by the test.
+    }
+  }
   await rm(dir, { recursive: true, force: true });
 });
 
 /** Raw SQL access to the same file, for assertions about what is stored. */
 function raw(path = file) {
   const db = new DatabaseSync(path);
+  opened.push(db);
   return {
     get: (sql: string) => db.prepare(sql).get() as Record<string, unknown>,
     all: (sql: string) => db.prepare(sql).all() as Record<string, unknown>[],
