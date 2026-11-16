@@ -11,10 +11,29 @@ import {
   session,
   type MenuItemConstructorOptions,
 } from 'electron';
-import { APP_ORIGIN, BACKUP_CHANNEL, type BackupResponse } from './api';
+import {
+  APP_ORIGIN,
+  BACKUP_CHANNEL,
+  DB_CLEAR_CHANNEL,
+  DB_LOAD_CHANNEL,
+  DB_SAVE_CHANNEL,
+  FLUSH_DONE_CHANNEL,
+  FLUSH_REQUEST_CHANNEL,
+  type BackupResponse,
+  type DbLoadResponse,
+  type DbResponse,
+} from './api';
 import { forbiddenSwitch, isAllowedRequest, isAppUrl, mimeType, SECURITY_HEADERS } from './network';
 import { resolveAppPath } from './appProtocol';
 import { backupStatus, backupTextError, saveAutoBackup } from './backups';
+import {
+  clearRequest,
+  DB_FILE_NAME,
+  loadRequest,
+  openInventoryDb,
+  saveRequest,
+  type InventoryDb,
+} from './db';
 import {
   DEFAULT_SIZE,
   isVisibleOn,
@@ -26,6 +45,8 @@ import {
 const APP_NAME = 'Mi-lab';
 const SCHEME = 'app';
 const BUILD_DIR = 'dist-desktop';
+/** How long closing the window waits for the page to write its pending changes. */
+const FLUSH_TIMEOUT_MS = 5_000;
 
 // The installed app refuses to start with remote debugging (DevTools protocol) switches: nothing
 // else on the machine may drive it. Source runs (`pnpm run desktop`) keep them for testing.
@@ -44,6 +65,8 @@ app.setAppUserModelId('sv.mi-lab.app');
 app.enableSandbox();
 
 let mainWindow: BrowserWindow | undefined;
+let inventoryDb: InventoryDb | undefined;
+let inventoryDbError: string | undefined;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -58,6 +81,7 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 const backupDir = () => join(app.getPath('documents'), 'Mi-lab', 'Respaldos');
+const dbFile = () => join(app.getPath('userData'), DB_FILE_NAME);
 const windowStateFile = () => join(app.getPath('userData'), 'window-state.json');
 
 function readWindowState(): WindowState | undefined {
@@ -136,23 +160,85 @@ function start(): void {
     item.setSaveDialogOptions({ filters });
   });
 
+  openDatabase();
+
   ipcMain.handle(BACKUP_CHANNEL, async (event, text: unknown): Promise<BackupResponse> => {
     if (!event.senderFrame || !isAppUrl(event.senderFrame.url)) {
       return { ok: false, error: 'Origen no permitido.' };
     }
     try {
-      if (text === null) return { ok: true, status: await backupStatus(backupDir()) };
+      const database = dbFile();
+      if (text === null)
+        return { ok: true, status: { ...(await backupStatus(backupDir())), database } };
       const invalid = backupTextError(text);
       if (invalid) return { ok: false, error: invalid };
-      return { ok: true, status: await saveAutoBackup(backupDir(), text as string, new Date()) };
+      const status = await saveAutoBackup(backupDir(), text as string, new Date());
+      return { ok: true, status: { ...status, database } };
     } catch {
       return { ok: false, error: 'No se pudo guardar el respaldo automático.' };
     }
   });
 
+  // The inventory database. Every request is checked to come from the app's own page; the page
+  // validates what it loads with data/migrate.ts (like any data that enters the app).
+  const fromApp = (event: Electron.IpcMainInvokeEvent) =>
+    !!event.senderFrame && isAppUrl(event.senderFrame.url);
+  const refused = { ok: false as const, error: 'Origen no permitido.' };
+  ipcMain.handle(DB_LOAD_CHANNEL, (event): DbLoadResponse =>
+    fromApp(event) ? loadRequest(inventoryDb, inventoryDbError) : refused,
+  );
+  ipcMain.handle(DB_SAVE_CHANNEL, (event, text: unknown): DbResponse =>
+    fromApp(event) ? saveRequest(inventoryDb, text, inventoryDbError) : refused,
+  );
+  ipcMain.handle(DB_CLEAR_CHANNEL, (event): DbResponse =>
+    fromApp(event) ? clearRequest(inventoryDb, inventoryDbError) : refused,
+  );
+
   hardenWebContents();
   Menu.setApplicationMenu(buildMenu());
   createWindow();
+}
+
+function openDatabase(): void {
+  try {
+    inventoryDb = openInventoryDb(dbFile());
+  } catch (error) {
+    const newer = error instanceof Error && /versión más nueva/.test(error.message);
+    inventoryDbError = newer
+      ? (error as Error).message
+      : `No se pudo abrir la base de datos del inventario (${dbFile()}). Cierra otras copias de Mi-lab y vuelve a abrirla.`;
+  }
+  // Closing checkpoints the WAL into mi-lab.db.
+  app.on('will-quit', () => inventoryDb?.close());
+}
+
+/**
+ * The page saves 300 ms after each change (and on `pagehide`); saving goes through async IPC. To
+ * not lose the last change, closing the window first asks the page to write what is pending and
+ * waits for its answer (at most FLUSH_TIMEOUT_MS), then closes for real.
+ */
+function flushBeforeClose(window: BrowserWindow): void {
+  let state: 'open' | 'flushing' | 'done' = 'open';
+  window.on('close', (event) => {
+    const contents = window.webContents;
+    if (state === 'done' || contents.isCrashed() || !isAppUrl(contents.getURL())) return;
+    event.preventDefault();
+    if (state === 'flushing') return;
+    state = 'flushing';
+    const finish = () => {
+      if (state === 'done') return;
+      state = 'done';
+      clearTimeout(timer);
+      ipcMain.removeListener(FLUSH_DONE_CHANNEL, onDone);
+      if (!window.isDestroyed()) window.close();
+    };
+    const onDone = (doneEvent: Electron.IpcMainEvent) => {
+      if (doneEvent.sender === contents) finish();
+    };
+    const timer = setTimeout(finish, FLUSH_TIMEOUT_MS);
+    ipcMain.on(FLUSH_DONE_CHANNEL, onDone);
+    contents.send(FLUSH_REQUEST_CHANNEL);
+  });
 }
 
 /**
@@ -240,6 +326,7 @@ function createWindow(): void {
   if (saved?.maximized) window.maximize();
   window.once('ready-to-show', () => window.show());
   window.on('close', () => writeWindowState(window));
+  flushBeforeClose(window);
   window.on('closed', () => {
     mainWindow = undefined;
   });

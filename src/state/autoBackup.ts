@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { DesktopDatabaseBridge } from '@/data/desktopRepository';
 import { serializeBackup } from './backup';
 import type { useInventoryStore } from './store';
 
@@ -8,6 +9,8 @@ export interface AutoBackupStatus {
   lastFile?: string;
   /** ISO 8601. */
   lastSavedAt?: string;
+  /** The inventory database file (`mi-lab.db`). */
+  database?: string;
 }
 
 type BridgeResponse = { ok: true; status: AutoBackupStatus } | { ok: false; error: string };
@@ -16,6 +19,8 @@ type BridgeResponse = { ok: true; status: AutoBackupStatus } | { ok: false; erro
 export interface DesktopBridge {
   /** Saves today's automatic backup, or only reports the last one when `text` is `null`. */
   backup(text: string | null): Promise<BridgeResponse>;
+  /** The inventory database (absent in versions before T9.4). */
+  db?: DesktopDatabaseBridge;
 }
 
 declare global {

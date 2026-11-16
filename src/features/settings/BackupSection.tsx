@@ -38,6 +38,11 @@ function AutoBackupInfo() {
         Último respaldo automático:{' '}
         {status?.lastSavedAt ? formatSavedAt(status.lastSavedAt) : 'todavía no hay ninguno'}
       </p>
+      {status?.database ? (
+        <p className="text-footnote text-label-secondary">
+          El inventario se guarda en <span className="break-all">{status.database}</span>.
+        </p>
+      ) : null}
       {error ? (
         <p role="alert" className="text-footnote text-danger">
           {error}

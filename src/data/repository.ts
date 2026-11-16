@@ -16,6 +16,11 @@ export interface InventoryRepository {
    * repository may not offer it.
    */
   readRaw?(): Promise<string | null>;
+  /**
+   * Set by `load()` when it succeeded with a problem the user should know about (Spanish), e.g.
+   * the desktop database could not take over the earlier data and the old storage is used.
+   */
+  readonly warning?: string;
 }
 
 export class RepositoryError extends Error {

@@ -82,6 +82,7 @@ importación directa de Excel, notificaciones por correo.
 | App de escritorio | **`electron`** + **`electron-builder`** (MIT, solo `devDependencies`; el bundle web no cambia) | Instalador `.exe` (NSIS, por usuario, sin administrador) para personas no técnicas, sin internet. Se descartó Tauri (requiere Rust/WebView2 en el equipo de compilación) y una PWA (no da instalador ni acceso a Documentos). Ver §13 |
 | Lint/format | ESLint (config de Vite) + Prettier | |
 | Persistencia MVP | `localStorage` detrás de la interfaz `InventoryRepository` | Cambiar a API/DB sin tocar UI |
+| Persistencia escritorio | SQLite con **`node:sqlite`** (incluido en Electron 45 / Node 24; sin dependencia nueva) en el proceso principal, `DesktopRepository` en la página (T9.4) | Sin el límite de ≈ 5–10 MB de `localStorage`; transacciones y durabilidad ante cortes de luz. Se descartaron `better-sqlite3` (módulo nativo a recompilar por versión de Electron) y SQLCipher |
 
 **No agregar otras dependencias** sin anotarlo primero en esta tabla con su motivo.
 
@@ -610,6 +611,9 @@ export interface InventoryRepository {
 }
 ```
 
+- `desktopRepository` (app de escritorio, T9.4): SQLite en el proceso principal por IPC
+  (`window.miLabDesktop.db`); migra una vez lo que hubiera en `localStorage`. Lo elige
+  `defaultRepository()` en `state/store.ts` cuando existe el puente.
 - `localStorageRepository`: clave `mi-lab:inventory:v1`, JSON. Si `load()` devuelve `null`, el
   store carga el seed.
 - Interfaz asíncrona **a propósito**, para que una futura `apiRepository` (REST/Supabase) no
@@ -766,6 +770,11 @@ librería va con `import()`); el informe usa las mismas derivaciones que la pant
   suma SHA-256 del instalador; sin corrector ortográfico (descargaba de Google), sin depuración
   remota en la app instalada; prueba de humo (`scripts/desktop-smoke.mjs`) y del instalador en el
   CI de Windows. Pendiente: firma de código.
+- [x] **T9.4** Escritorio: inventario en SQLite (`mi-lab.db` en `%APPDATA%\Mi-lab`) en vez de
+  `localStorage` (límite ≈ 17 000 movimientos). `electron/db.ts` (tablas normalizadas, `user_version`
+  y migraciones, guardado por diferencias en una transacción), IPC `mi-lab:db-*` con origen
+  verificado, `DesktopRepository` con migración verificada desde `localStorage`, guardado de lo
+  pendiente al cerrar la ventana. Web sin cambios. Prueba de humo en dos fases (con reinicio) en CI.
 
 ## 11. Protocolo para agentes
 
@@ -857,3 +866,4 @@ librería va con `import()`); el informe usa las mismas derivaciones que la pant
 | 2026-11-15 | Seguridad Electron: `contextIsolation`, `sandbox`, sin `nodeIntegration`, permisos denegados, navegación/`window.open` bloqueados (enlaces `http(s)` van al navegador), una sola instancia, sin herramientas de desarrollo en el instalador. El preload expone UNA función (`backup(text \| null)`); el nombre del archivo lo genera el proceso principal (`mi-lab-respaldo-AAAA-MM-DD.json`), con tope de 20 MB y máximo 30 copias rotativas | Mínima superficie entre la página y el sistema de archivos |
 | 2026-11-15 | Las descargas (respaldo JSON y `.xlsx`) usan el diálogo nativo "Guardar como" de Electron (no se fija ruta en `will-download`; solo se añade el filtro de tipo). El instalador no está firmado: SmartScreen avisa (documentado en `docs/INSTALACION.md`). La versión del instalador sale de `package.json` (pasó de 0.0.0 a 1.0.0) | Flujo simple para usuarios; la firma requiere un certificado de pago |
 | 2026-11-16 | **Seguridad (T9.3)**: el proceso principal cancela toda petición que no sea `app://mi-lab`, `data:` o `blob:` propio (`electron/network.ts`); los archivos de la app se leen del `app.asar` con `fs` (no hay `file://`) y se sirven con la CSP como cabecera (+ `frame-ancestors 'none'`, `nosniff`); sin `shell.openExternal`; `isAppUrl` compara esquema y host porque Node da a `app://` el origen opaco `'null'` (antes el IPC de respaldos rechazaba siempre). Fusibles: sin RunAsNode, NODE_OPTIONS ni --inspect, solo `app.asar` con integridad. Dependencias exactas (`savePrefix: ''`), `minimumReleaseAge` 3 días (excepción revisada: `electron@45.3.2`), `overrides` de `minimatch` → 11.0.8 (GHSA-g3hv-75wg-m249, solo desarrollo). CI: acciones por hash, `persist-credentials: false`, `pnpm audit --audit-level=low`, `SHA256SUMS.txt` | Equipo de laboratorio conectado a internet; ver `docs/SEGURIDAD.md` |
+| 2026-11-16 | **SQLite en escritorio (T9.4)**: `node:sqlite` (`DatabaseSync`) en el proceso principal, archivo `userData/mi-lab.db`; `journal_mode=WAL` + `synchronous=FULL` (cada guardado confirmado sobrevive a un corte de luz; con guardados cada ≥ 300 ms el coste del fsync no se nota), `foreign_keys=ON` con FK diferidas, tablas `STRICT`, esquema versionado con `PRAGMA user_version` (cada migración en su transacción; una base de una versión más nueva se rechaza sin tocarla). Guardar = diff por id en UNA transacción (upsert de nuevos/cambiados, delete de los que faltan) contra una caché en memoria de lo escrito; el orden de los arreglos se guarda en `pos` y se conserva al agregar/borrar sin renumerar. Medido (Node 22, ×10 = 21 600 movimientos, 3.8 MB): 1.ª escritura 258 ms, carga 166 ms, guardar 1 cambio 77 ms, agregar+borrar 1 movimiento 32 ms, abrir+cargar 120 ms. La página sigue enviando el `InventoryData` completo (JSON ≤ 20 MB ≈ 80 000 movimientos) y valida lo que carga con `migrate`; el puente expone `load/save/clear/onFlushRequest` (`readRaw` del repositorio usa `load`: es el mismo texto). Migración: mientras exista la clave `mi-lab:inventory:v1` y no `mi-lab:migrated-to-sqlite`, sus datos (si son válidos) se escriben, se releen y se comparan; solo si coinciden se renombra la clave (se conserva el JSON). Si falla, la sesión sigue en `localStorage` con un aviso y se reintenta al abrir. Cierre: el evento `close` de la ventana pide a la página guardar lo pendiente y espera (máx. 5 s); `pagehide` sigue como respaldo. Electron no emite `close` si la página llama a `window.close()` (la app no lo hace) | Quitar el límite de `localStorage` antes de importar datos reales; nunca perder datos en la migración ni al cerrar |

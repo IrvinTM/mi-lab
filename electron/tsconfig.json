@@ -15,5 +15,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["."]
+  "include": ["."],
+  // Imports src/ test data (buildSeed, largeData): type-checked by tsconfig.app.json instead.
+  "exclude": ["db.test.ts"]
 }

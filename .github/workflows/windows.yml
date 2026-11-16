@@ -41,14 +41,23 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       # Real Windows checks (docs/SEGURIDAD.md). 1) The app from source, driven over the DevTools
-      # protocol: pages, routes, reload, localStorage, backups (IPC), network blocked, CSP, UI flow.
-      - name: Prueba de humo (código fuente, DevTools)
+      # protocol: pages, routes, reload, backups and inventory database (IPC), migration from
+      # localStorage, network blocked, CSP, UI flow. Phase 1 ends by closing the app (WM_CLOSE)
+      # right after a change; phase 2 starts it again and checks the data in the UI and mi-lab.db.
+      - name: Prueba de humo (código fuente, DevTools, con reinicio)
         shell: pwsh
         run: |
           # require('electron') returns the binary path (downloading it on first use).
           $electron = (node -e "console.log(require('electron'))" | Select-Object -Last 1).Trim()
           $app = Start-Process -PassThru -FilePath $electron -ArgumentList '.', '--remote-debugging-port=9333'
-          try { node scripts/desktop-smoke.mjs 9333; if ($LASTEXITCODE -ne 0) { exit 1 } }
+          try {
+            node scripts/desktop-smoke.mjs 9333 first $app.Id; if ($LASTEXITCODE -ne 0) { exit 1 }
+            $app.WaitForExit(20000) | Out-Null
+          }
+          finally { Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue }
+          Start-Sleep -Seconds 2
+          $app = Start-Process -PassThru -FilePath $electron -ArgumentList '.', '--remote-debugging-port=9333'
+          try { node scripts/desktop-smoke.mjs 9333 restart; if ($LASTEXITCODE -ne 0) { exit 1 } }
           finally { Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue }
 
       # 2) The packaged Mi-lab.exe (fuses + asar integrity): it must open a window whose title
@@ -95,12 +104,15 @@ jobs:
           if (-not ($title -like '* · Mi-lab')) { throw 'La app instalada no abrió la ventana' }
           $data = Join-Path $env:APPDATA 'Mi-lab'
           if (-not (Test-Path $data)) { throw "No se creó $data" }
+          $db = Join-Path $data 'mi-lab.db'
+          if (-not (Test-Path $db)) { throw "No se creó la base de datos $db" }
           Start-Sleep -Seconds 2
           $uninstaller = Join-Path $env:LOCALAPPDATA 'Programs/Mi-lab/Uninstall Mi-lab.exe'
           $u = Start-Process -PassThru -Wait -FilePath $uninstaller -ArgumentList '/S'
           Start-Sleep -Seconds 5
           if (Test-Path $installed) { throw 'El desinstalador no quitó la app' }
           if (-not (Test-Path $data)) { throw 'El desinstalador borró los datos del usuario' }
+          if (-not (Test-Path $db)) { throw 'El desinstalador borró la base de datos' }
           Write-Host "Instalación, apertura y desinstalación correctas; datos conservados en $data"
 
       - name: Suma SHA-256 del instalador

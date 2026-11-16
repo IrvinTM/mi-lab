@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { DEFAULT_SETTINGS, migrate } from '@/data/migrate';
+import { DesktopRepository, type DesktopDatabaseBridge } from '@/data/desktopRepository';
 import { LocalStorageRepository } from '@/data/localStorageRepository';
 import type { InventoryRepository } from '@/data/repository';
 import { todayISO } from '@/domain/dates';
@@ -56,6 +57,8 @@ export interface InventoryState {
   /** Why loading failed (stored data unreadable) or the last save failed. */
   loadError?: string;
   saveError?: string;
+  /** A storage problem that did not stop loading (see `InventoryRepository.warning`). */
+  storageWarning?: string;
   /** Whether this build offers the sample data (first run and reset). Off in production. */
   demoData: boolean;
   data: InventoryData;
@@ -190,6 +193,7 @@ export function createInventoryStore(repository: InventoryRepository, options: S
         initPromise ??= (async () => {
           try {
             const stored = await repository.load();
+            if (repository.warning) set({ storageWarning: repository.warning });
             if (stored) {
               set({ data: stored, status: 'ready' });
             } else {
@@ -563,4 +567,13 @@ export function createInventoryStore(repository: InventoryRepository, options: S
   return store;
 }
 
-export const useInventoryStore = createInventoryStore(new LocalStorageRepository());
+/** The desktop app keeps the inventory in SQLite (main process); the web app in localStorage. */
+export function defaultRepository(
+  bridge: DesktopDatabaseBridge | undefined = typeof window === 'undefined'
+    ? undefined
+    : window.miLabDesktop?.db,
+): InventoryRepository {
+  return bridge ? new DesktopRepository(bridge) : new LocalStorageRepository();
+}
+
+export const useInventoryStore = createInventoryStore(defaultRepository());

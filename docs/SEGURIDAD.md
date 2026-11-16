@@ -62,21 +62,40 @@ datos de pacientes.** Amenazas consideradas:
 
 Ya estaban bien (revisado): `contextIsolation`, `sandbox`, `nodeIntegration: false`,
 `webSecurity`, sin `<webview>`, permisos denegados (cámara, ubicación, notificaciones…), una sola
-instancia, preload con una única función y validación en el proceso principal (origen, tamaño
-≤ 20 MB, JSON), nombre de archivo de respaldo generado por el proceso principal, escritura
+instancia, preload mínimo (respaldo y base de datos) con validación en el proceso principal
+(origen, tamaño ≤ 20 MB, JSON), nombre de archivo de respaldo generado por el proceso principal, escritura
 atómica, sin `eval`/`innerHTML`, Excel sin fórmulas (texto como texto), respaldo importado
 validado campo a campo, sin telemetría ni `crashReporter`.
 
+## Base de datos del inventario (T9.4)
+
+- **Dónde:** `%APPDATA%\Mi-lab\mi-lab.db` (SQLite; con la app abierta, también `mi-lab.db-wal` y
+  `mi-lab.db-shm`). La abre solo el proceso principal con `node:sqlite`, el SQLite que trae
+  Electron: **ninguna dependencia nueva** ni módulo nativo.
+- **Canal IPC nuevo:** `mi-lab:db-load`, `mi-lab:db-save` y `mi-lab:db-clear` (`ipcRenderer.invoke`),
+  más `mi-lab:flush-request`/`mi-lab:flush-done` para guardar lo pendiente al cerrar. El preload
+  sigue sin acceso a archivos: solo reenvía. En el proceso principal **cada petición** comprueba que
+  venga de la página de la app (`isAppUrl(event.senderFrame.url)`); `save` acepta solo texto ≤ 20 MB
+  que sea un objeto JSON. Las consultas SQL son fijas y con parámetros (`?`): ningún texto de la
+  página llega a formar SQL. Las tablas son `STRICT`, con `CHECK`, `NOT NULL` y claves foráneas, y
+  cada guardado es una transacción: un dato mal formado se rechaza sin dejar nada a medias. El
+  contenido completo lo valida la página con `data/migrate.ts` al cargarlo (como un respaldo).
+- **Sin cifrar:** igual que antes con `localStorage`, quien acceda a la cuenta de Windows o al disco
+  puede leer `mi-lab.db`. La protección es BitLocker y una cuenta con contraseña (ver abajo). No se
+  usó SQLCipher para no añadir un módulo nativo ni una clave que guardar en el mismo equipo.
+- **Migración:** los datos de `localStorage` de la versión anterior se pasan a la base, se releen y
+  se comparan; solo entonces la copia se renombra a `mi-lab:migrated-to-sqlite` (no se borra).
+
 ## Riesgos que quedan (decisiones del laboratorio)
 
-| Riesgo                                                         | Por qué importa                                                                                                     | Recomendación                                                                                                                                   |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Instalador sin firma**                                       | Windows muestra SmartScreen y no hay forma de que el usuario verifique al editor                                    | Comprar un certificado de firma de código (OV/EV, ≈ USD 200–400 al año) o usar Azure Trusted Signing; mientras tanto, verificar la suma SHA-256 |
-| **Instalación por usuario** (`%LOCALAPPDATA%\Programs\Mi-lab`) | Cualquier programa que corra con la cuenta del usuario puede reemplazar `Mi-lab.exe` (el `app.asar` sí se verifica) | Para máxima protección: instalación por equipo en `Archivos de programa` (requiere administrador; cambiar `perMachine: true`). Que la decida TI |
-| **Datos sin cifrar** en `%APPDATA%\Mi-lab` y en los respaldos  | Quien acceda a la cuenta o al disco puede leer el inventario                                                        | Cifrado de disco (BitLocker) y una cuenta de Windows con contraseña por persona                                                                 |
-| **Respaldos en `Documentos`**                                  | Si `Documentos` está sincronizado con OneDrive, las copias salen del equipo a la nube                               | Desactivar la copia de seguridad de OneDrive de `Documentos` o decidir otra carpeta (se puede cambiar en código)                                |
-| **`localStorage`** limitado a ≈ 5–10 MB                        | No es de seguridad, es de disponibilidad: con años de movimientos puede llenarse                                    | El aviso ya existe; planificar migrar a un archivo/SQLite en el proceso principal si crece                                                      |
-| Servidor de desarrollo con `allowedHosts: true`                | Solo afecta a `pnpm dev` (túneles), **no** a la app instalada                                                       | No usar `pnpm dev` en el equipo del laboratorio                                                                                                 |
+| Riesgo                                                                      | Por qué importa                                                                                                        | Recomendación                                                                                                                                   |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Instalador sin firma**                                                    | Windows muestra SmartScreen y no hay forma de que el usuario verifique al editor                                       | Comprar un certificado de firma de código (OV/EV, ≈ USD 200–400 al año) o usar Azure Trusted Signing; mientras tanto, verificar la suma SHA-256 |
+| **Instalación por usuario** (`%LOCALAPPDATA%\Programs\Mi-lab`)              | Cualquier programa que corra con la cuenta del usuario puede reemplazar `Mi-lab.exe` (el `app.asar` sí se verifica)    | Para máxima protección: instalación por equipo en `Archivos de programa` (requiere administrador; cambiar `perMachine: true`). Que la decida TI |
+| **Datos sin cifrar** en `%APPDATA%\Mi-lab` (`mi-lab.db`) y en los respaldos | Quien acceda a la cuenta o al disco puede leer el inventario                                                           | Cifrado de disco (BitLocker) y una cuenta de Windows con contraseña por persona                                                                 |
+| **Respaldos en `Documentos`**                                               | Si `Documentos` está sincronizado con OneDrive, las copias salen del equipo a la nube                                  | Desactivar la copia de seguridad de OneDrive de `Documentos` o decidir otra carpeta (se puede cambiar en código)                                |
+| ~~**`localStorage`** limitado a ≈ 5–10 MB~~                                 | Resuelto en la app de escritorio (T9.4): SQLite; el guardado por IPC admite hasta 20 MB de JSON (≈ 80 000 movimientos) | La versión web sigue con `localStorage` y su aviso                                                                                              |
+| Servidor de desarrollo con `allowedHosts: true`                             | Solo afecta a `pnpm dev` (túneles), **no** a la app instalada                                                          | No usar `pnpm dev` en el equipo del laboratorio                                                                                                 |
 
 ## Actualizaciones
 
@@ -106,10 +125,18 @@ La app no abre puertos, así que "estar expuesta a internet" depende del equipo,
 ## Cómo se verificó
 
 - `pnpm audit` (todas las dependencias): 0 vulnerabilidades.
-- `pnpm run check`: 994 pruebas, incluidas las de `electron/network.test.ts` (aislamiento de red,
+- `pnpm run check`: 1047 pruebas (T9.4: `electron/db.test.ts` con esquema, migraciones de
+  `user_version`, ida y vuelta exacta del seed y de ×10 datos, diff, transacciones y textos hostiles;
+  repositorio de escritorio y migración desde `localStorage`), y desde T9.3 incluidas las de `electron/network.test.ts` (aislamiento de red,
   origen de la app, CSP igual a la del build web, tipos de archivo, interruptores de depuración).
 - **Prueba de humo en ejecución** (`scripts/desktop-smoke.mjs`, por el protocolo DevTools) con la
-  app en Linux bajo Xvfb: 28 comprobaciones — carga en `app://mi-lab`, sin Node en la página,
+  app en Linux bajo Xvfb, en dos fases con **reinicio de la app** (T9.4): base de datos por IPC (ida
+  y vuelta con `U+0000` y unicode, rechazo de datos incompletos y de JSON inválido), migración real
+  desde `localStorage` (clave renombrada), un cambio hecho justo antes de cerrar la app como el
+  usuario (con el reloj de la página detenido para que solo pueda guardarlo el aviso de cierre) y,
+  tras volver a abrirla, los datos en la interfaz y leídos directamente de `mi-lab.db`. Control: con
+  el guardado al cerrar desactivado (aviso de cierre y `pagehide`) la fase 2 falla. Además, las
+  comprobaciones de T9.3: 28 comprobaciones — carga en `app://mi-lab`, sin Node en la página,
   respaldo automático por IPC (y rechazo de JSON inválido), peticiones a internet, a la red local
   y a `file:` bloqueadas **también con la CSP desactivada** (filtro del proceso principal), CSP
   como cabecera, `..` y tipos desconocidos → 404, `window.open` y navegación externa bloqueados,
@@ -124,7 +151,9 @@ La app no abre puertos, así que "estar expuesta a internet" depende del equipo,
   del `app.asar`, sirve la página por `app://`, el puente de respaldo responde con la ruta
   `C:\users\…\Documents\Mi-lab\Respaldos`, `fetch` a internet bloqueado, CSP como cabecera.
   Wine no logra dibujar la interfaz de Chromium 45 (fallo de página dentro de Wine), por eso:
-- **En el CI de Windows** (cada compilación): la misma prueba de humo sobre Windows real, el
+- **En el CI de Windows** (cada compilación): la misma prueba de humo (las dos fases, cerrando con
+  `CloseMainWindow`) sobre Windows real, que la instalación cree `%APPDATA%\Mi-lab\mi-lab.db` y
+  que el desinstalador lo conserve, el
   `Mi-lab.exe` empaquetado debe abrir una ventana con el título de la página y negarse a arrancar
   con `--remote-debugging-port`, y el instalador se instala en silencio, la app instalada abre y
   el desinstalador la quita **conservando los datos**.

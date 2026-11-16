@@ -81,7 +81,22 @@ function LoadError({ message }: { message?: string }) {
  * the changes, but they would be gone after a reload. Stays until a later save succeeds.
  */
 function SaveError() {
-  const message = useInventoryStore((state) => state.saveError);
+  const saveError = useInventoryStore((state) => state.saveError);
+  // Desktop: the earlier data could not move to the database; it is still saved the old way.
+  const warning = useInventoryStore((state) => state.storageWarning);
+  if (!saveError && warning) {
+    return (
+      <div
+        role="alert"
+        data-print="hide"
+        className="mb-4 flex items-start gap-2 rounded-sm bg-orange/15 px-3 py-2 text-footnote text-label"
+      >
+        <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+        <p className="m-0">{warning}</p>
+      </div>
+    );
+  }
+  const message = saveError;
   if (!message) return null;
   return (
     <div

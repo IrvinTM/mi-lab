@@ -23,5 +23,5 @@
     "baseUrl": ".",
     "paths": { "@/*": ["src/*"] }
   },
-  "include": ["src", "scripts"]
+  "include": ["src", "scripts", "electron/db.test.ts"]
 }
