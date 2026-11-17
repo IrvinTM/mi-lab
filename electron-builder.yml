@@ -55,3 +55,20 @@ nsis:
   deleteAppDataOnUninstall: false
   # Per-user install: the elevation helper is never needed.
   packElevateHelper: false
+# Linux build (`pnpm run dist:linux`): portable AppImage plus a .deb for Debian/Ubuntu.
+linux:
+  target:
+    - target: AppImage
+      arch: x64
+    - target: deb
+      arch: x64
+  icon: build/icon.png
+  category: Office
+  executableName: mi-lab
+  syncDesktopName: true
+  maintainer: Mi-lab <irvint698@gmail.com>
+  synopsis: Control de inventario de reactivos de laboratorio clínico
+appImage:
+  artifactName: Mi-lab-${version}-x86_64.AppImage
+deb:
+  artifactName: mi-lab_${version}_amd64.deb
