@@ -16,3 +16,10 @@ overrides:
   # GHSA-g3hv-75wg-m249 (moderate, ReDoS) in minimatch 7–11.0.0, pulled in by dev tools only
   # (typescript-eslint, electron-builder). Nothing of it ships in the app.
   'minimatch@>=7.0.0 <11.0.1': '11.0.8'
+auditConfig:
+  ignoreGhsas:
+    # GHSA-fc5q-39xc-vjpf (high, ReDoS) in picomatch <=4.0.7, no patched version yet (2026-11-17).
+    # Only build tools use it (vite, tailwind, eslint, electron-builder) with fixed glob patterns
+    # from this repo; nothing of it ships in the app (not in app.asar, no production dependency).
+    # Remove this entry as soon as a fixed picomatch is published and override it instead.
+    - GHSA-fc5q-39xc-vjpf
