@@ -2,7 +2,7 @@
   "name": "mi-lab",
   "productName": "Mi-lab",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Control de inventario de reactivos de laboratorio clínico",
   "author": "Mi-lab",
   "main": "dist-electron/main.js",

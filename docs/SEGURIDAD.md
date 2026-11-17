@@ -118,7 +118,7 @@ La app no abre puertos, así que "estar expuesta a internet" depende del equipo,
    redirigidos en el router hacia este equipo.
 4. BitLocker activado (cifra el inventario y los respaldos si roban el equipo o el disco).
 5. Instalar solo desde el Release de GitHub y comprobar la suma SHA-256:
-   `Get-FileHash .\Mi-lab-Setup-1.0.0.exe -Algorithm SHA256` debe coincidir con
+   `Get-FileHash .\Mi-lab-Setup-<versión>.exe -Algorithm SHA256` debe coincidir con
    `SHA256SUMS.txt`.
 6. Copiar periódicamente un respaldo (Ajustes → Respaldo) a un medio externo guardado aparte.
 

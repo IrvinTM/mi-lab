@@ -9,7 +9,7 @@ administrador.
 2. En la versión más reciente, descarga el archivo **`Mi-lab-Setup-….exe`**. Descárgalo solo de
    ahí: nunca de un correo, un enlace enviado por chat o una memoria USB de origen desconocido.
 3. (Recomendado, o que lo haga TI) Comprueba que el archivo es el original: en PowerShell,
-   `Get-FileHash .\Mi-lab-Setup-1.0.0.exe -Algorithm SHA256` debe dar el mismo valor que aparece
+   `Get-FileHash .\Mi-lab-Setup-<versión>.exe -Algorithm SHA256` debe dar el mismo valor que aparece
    en `SHA256SUMS.txt` de la misma versión.
 
 ## 2. Instalar
