@@ -60,6 +60,11 @@ protocol.registerSchemesAsPrivileged([
   { scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ]);
 
+// The installer ships only the Spanish Chromium locales (electronLanguages). On a system in another
+// language Chromium would look for that locale's strings, and without them the native file
+// dialogs ("Restaurar respaldo", "Guardar como") silently fail to open. Always use es-419.
+app.commandLine.appendSwitch('lang', 'es-419');
+
 app.setAppUserModelId('sv.mi-lab.app');
 // Every renderer runs in the Chromium sandbox, whatever its webPreferences say.
 app.enableSandbox();
@@ -148,7 +153,8 @@ function start(): void {
   session.defaultSession.setPermissionCheckHandler(() => false);
 
   // No handler sets a save path, so Electron shows the native "Guardar como" dialog for the
-  // backup (.json) and report (.xlsx) downloads. Only the file-type filter is added here.
+  // backup (.json) and report (.xlsx) downloads. Only the title (otherwise the blob: URL on Linux)
+  // and the file-type filter are added here.
   session.defaultSession.on('will-download', (_event, item) => {
     const extension = extname(item.getFilename()).toLowerCase();
     const filters =
@@ -157,7 +163,7 @@ function start(): void {
         : extension === '.json'
           ? [{ name: 'Respaldo de Mi-lab', extensions: ['json'] }]
           : [];
-    item.setSaveDialogOptions({ filters });
+    item.setSaveDialogOptions({ title: 'Guardar como', filters });
   });
 
   openDatabase();
