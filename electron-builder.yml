@@ -68,6 +68,10 @@ linux:
   syncDesktopName: true
   maintainer: Mi-lab <irvint698@gmail.com>
   synopsis: Control de inventario de reactivos de laboratorio clínico
+# New static AppImage runtime: it needs no libfuse2, which Ubuntu 22.04+ no longer installs
+# (the legacy runtime fails there with "dlopen(): error loading libfuse.so.2").
+toolsets:
+  appimage: '1.0.3'
 appImage:
   artifactName: Mi-lab-${version}-x86_64.AppImage
 deb:
