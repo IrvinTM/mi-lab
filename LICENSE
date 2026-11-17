@@ -1,0 +1,43 @@
+Mi-lab — Licencia privativa
+Copyright (c) 2026 IrvinTM. Todos los derechos reservados.
+
+(English: Proprietary software. All rights reserved. No license is granted except by prior written
+permission of the copyright holder.)
+
+1. Titularidad. Mi-lab (código fuente, ejecutables, instaladores, documentación, diseño y demás
+   materiales de este repositorio, en adelante "el Software") es propiedad de IrvinTM y está
+   protegido por las leyes de derechos de autor y los tratados internacionales aplicables.
+
+2. Uso autorizado. Solo puede instalar y usar el Software quien cuente con autorización previa y
+   por escrito del titular, dentro de los límites de esa autorización. Sin ella no se concede
+   ningún derecho.
+
+3. Prohibiciones. Salvo autorización escrita del titular, queda prohibido:
+   a) copiar, reproducir o distribuir el Software, total o parcialmente;
+   b) modificarlo, traducirlo o crear obras derivadas a partir de él;
+   c) venderlo, alquilarlo, prestarlo, sublicenciarlo o ponerlo a disposición de terceros;
+   d) descompilarlo, desensamblarlo o aplicarle ingeniería inversa, salvo en la medida en que la
+      ley lo permita expresamente pese a esta restricción;
+   e) quitar o alterar avisos de derechos de autor, marcas o esta licencia.
+
+4. Repositorio público. Que el código pueda verse públicamente no concede ninguna licencia de uso,
+   copia, modificación ni distribución. Ver el repositorio y bifurcarlo dentro de GitHub solo se
+   permite en lo que exigen los Términos de servicio de GitHub.
+
+5. Componentes de terceros. El Software incluye componentes de terceros (por ejemplo Electron y
+   Chromium) que se rigen por sus propias licencias, incluidas junto al Software. Esta licencia
+   no las modifica.
+
+6. Sin garantía. El Software se entrega "tal cual", sin garantías de ningún tipo, expresas o
+   implícitas, incluidas las de comerciabilidad, idoneidad para un fin determinado y no
+   infracción. Quien lo use es responsable de verificar los datos de inventario y de conservar
+   sus respaldos.
+
+7. Limitación de responsabilidad. En la medida máxima que permita la ley, el titular no será
+   responsable de daños directos, indirectos, incidentales o consecuentes, ni de la pérdida de
+   datos, derivados del uso o la imposibilidad de uso del Software.
+
+8. Terminación. Cualquier autorización termina automáticamente si se incumple esta licencia; en
+   ese caso deben dejar de usarse y eliminarse todas las copias del Software.
+
+9. Contacto. Para solicitar autorización: https://github.com/IrvinTM

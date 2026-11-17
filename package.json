@@ -5,6 +5,7 @@
   "version": "1.0.1",
   "description": "Control de inventario de reactivos de laboratorio clínico",
   "author": "Mi-lab",
+  "license": "UNLICENSED",
   "main": "dist-electron/main.js",
   "desktopName": "mi-lab.desktop",
   "type": "module",

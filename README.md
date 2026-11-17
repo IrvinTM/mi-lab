@@ -34,4 +34,9 @@ pnpm run perf       # tiempos de las derivaciones con datos ×10 (lento; no form
 - [`docs/AUDIT.md`](docs/AUDIT.md): auditoría de rendimiento, seguridad y calidad (T7.3).
 - [`CLAUDE.md`](CLAUDE.md): reglas para agentes.
 
+## Licencia
+
+Software privativo. Copyright (c) 2026 IrvinTM. Todos los derechos reservados. Que el código sea
+público no autoriza a usarlo, copiarlo, modificarlo ni distribuirlo: ver [`LICENSE`](LICENSE).
+
 Created in [T3 Code](https://t3.codes).
