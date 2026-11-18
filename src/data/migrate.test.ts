@@ -113,6 +113,17 @@ describe('migrate: hostile or corrupt backups are rejected', () => {
       withMovement({ type: 'issue', quantity: 49 }),
       /LT123456 quedaría con saldo negativo/,
     ],
+    ['a funding source code below 0', patched('fundingSources', { code: -1 }), /entre 0 y 999999/],
+    [
+      'a funding source code past maxSourceCode',
+      patched('fundingSources', { code: LIMITS.maxSourceCode + 1 }),
+      /entre 0 y 999999/,
+    ],
+    [
+      'a quantity just past maxNumber',
+      patched('movements', { quantity: LIMITS.maxNumber + 1 }),
+      /mayor que 0/,
+    ],
     [
       'a giant text',
       patched('products', { name: 'x'.repeat(LIMITS.longText + 1) }),
@@ -211,5 +222,23 @@ describe('migrate: recoverable problems are sanitized', () => {
       todayOverride: '2026-12-01',
     };
     expect(migrate({ ...sampleData(), settings }).settings).toEqual(settings);
+  });
+
+  it('keeps sourceCode at 0 and 999_999 and drops out-of-range sourceCodes on lots and movements', () => {
+    const valid = sampleData();
+    valid.fundingSources = [
+      { code: LIMITS.minSourceCode, name: 'Mínima' },
+      { code: LIMITS.maxSourceCode, name: 'Máxima' },
+    ];
+    valid.lots[0]!.sourceCode = LIMITS.maxSourceCode;
+    valid.movements[0]!.sourceCode = LIMITS.minSourceCode;
+    expect(migrate(asJson(valid))).toEqual(valid);
+
+    const outOfRange = sampleData();
+    outOfRange.lots[0]!.sourceCode = -1;
+    outOfRange.movements[0]!.sourceCode = LIMITS.maxSourceCode + 1;
+    const migrated = migrate(asJson(outOfRange));
+    expect(migrated.lots[0]).not.toHaveProperty('sourceCode');
+    expect(migrated.movements[0]).not.toHaveProperty('sourceCode');
   });
 });

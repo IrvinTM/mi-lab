@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { daysUntil } from '@/domain/dates';
 import { expiryStatus } from '@/domain/expiry';
 import { allocateFefo, firstFefoLot } from '@/domain/fefo';
+import { LIMITS } from '@/domain/limits';
 import { productStock } from '@/domain/stock';
 import { isValid, validateIssue } from '@/domain/validation';
 import { formatExpiry, formatQuantity } from '@/lib/format';
@@ -67,6 +68,7 @@ export function IssueForm({
       productId,
       date,
       quantity: baseQuantity,
+      concept,
       lotId: manual ? effectiveLotId : null,
       fefoOverrideReason: reason,
     },
@@ -97,7 +99,11 @@ export function IssueForm({
 
   // Live preview of where the units will come from.
   const preview =
-    !manual && baseQuantity !== null && baseQuantity > 0 && stock
+    !manual &&
+    baseQuantity !== null &&
+    baseQuantity > 0 &&
+    baseQuantity <= LIMITS.maxNumber &&
+    stock
       ? allocateFefo(stock.lots, baseQuantity, today)
       : null;
 
@@ -163,11 +169,20 @@ export function IssueForm({
           max={today}
           error={shown('date')}
         />
-        <TextField label="Concepto" value={concept} onChange={setConcept} />
+        <TextField
+          label="Concepto"
+          value={concept}
+          onChange={setConcept}
+          maxLength={LIMITS.longText}
+          error={shown('concept')}
+        />
         <NumberField
           label="Cantidad"
           value={quantity}
           onChange={setQuantity}
+          max={
+            usesPackages ? Math.max(1, Math.floor(LIMITS.maxNumber / perPackage)) : LIMITS.maxNumber
+          }
           error={shown('quantity')}
           help={
             product && stock
@@ -233,6 +248,7 @@ export function IssueForm({
                 label="Motivo"
                 value={reason}
                 onChange={setReason}
+                maxLength={LIMITS.longText}
                 help="Por ejemplo: lote abierto en el equipo."
                 error={shown('fefoOverrideReason')}
               />

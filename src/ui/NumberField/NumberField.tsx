@@ -15,6 +15,8 @@ export interface NumberFieldProps
   onChange?: (value: number | null) => void;
   /** Accept a leading minus sign (e.g. stock adjustments). Off by default. */
   allowNegative?: boolean;
+  /** Largest integer magnitude accepted while typing (`|value| <= max`). */
+  max?: number;
 }
 
 function parse(text: string): number | null {
@@ -35,6 +37,7 @@ export function NumberField({
   value,
   onChange,
   allowNegative = false,
+  max = Number.MAX_SAFE_INTEGER,
   onBlur,
   ...inputProps
 }: NumberFieldProps) {
@@ -62,7 +65,9 @@ export function NumberField({
           onChange={(event) => {
             const next = sanitize(event.target.value);
             const parsed = parse(next);
-            if (parsed !== null && !Number.isSafeInteger(parsed)) return;
+            if (parsed !== null && (!Number.isSafeInteger(parsed) || Math.abs(parsed) > max)) {
+              return;
+            }
             setText(next);
             onChange?.(parsed);
           }}

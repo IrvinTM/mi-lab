@@ -11,6 +11,7 @@ function Controlled({
   initial?: number | null;
   onValue?: (value: number | null) => void;
   allowNegative?: boolean;
+  max?: number;
   error?: string;
 }) {
   const [value, setValue] = useState<number | null>(initial);
@@ -102,5 +103,26 @@ describe('NumberField', () => {
     const input = screen.getByLabelText('Cantidad');
     expect(input).toBeInvalid();
     expect(input).toHaveAccessibleDescription('Debe ser mayor que cero');
+  });
+
+  it('caps the typed magnitude at max (including negative numbers)', async () => {
+    const onValue = vi.fn();
+    const { unmount } = render(<Controlled max={1_000} onValue={onValue} />);
+    const input = screen.getByLabelText('Cantidad');
+    await userEvent.type(input, '1000');
+    expect(input).toHaveValue('1000');
+    expect(onValue).toHaveBeenLastCalledWith(1000);
+    // An extra digit would push past max=1000, so it is ignored.
+    await userEvent.type(input, '5');
+    expect(input).toHaveValue('1000');
+    expect(onValue).toHaveBeenLastCalledWith(1000);
+    unmount();
+
+    const onNegative = vi.fn();
+    render(<Controlled allowNegative max={1_000} onValue={onNegative} />);
+    const negInput = screen.getByLabelText('Cantidad');
+    await userEvent.type(negInput, '-10009');
+    expect(negInput).toHaveValue('-1000');
+    expect(onNegative).toHaveBeenLastCalledWith(-1000);
   });
 });

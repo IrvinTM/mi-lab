@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
+import { LIMITS } from '@/domain/limits';
 import type { Area } from '@/domain/types';
 import { countNoun } from '@/domain/plural';
 import { useInventoryStore } from '@/state/store';
@@ -27,6 +28,7 @@ function RenameForm({ area, onClose }: { area: Area; onClose: () => void }) {
       <TextField
         label="Nombre del área"
         value={name}
+        maxLength={LIMITS.longText}
         onChange={(value) => {
           setName(value);
           setError(undefined);
@@ -133,6 +135,7 @@ export function AreasSection() {
           className="flex-1"
           label="Nueva área"
           value={newName}
+          maxLength={LIMITS.longText}
           onChange={(value) => {
             setNewName(value);
             setAddError(undefined);

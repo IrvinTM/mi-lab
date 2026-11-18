@@ -1,4 +1,5 @@
 import { isValidISODate } from '@/domain/dates';
+import { LIMITS } from '@/domain/limits';
 import type {
   Area,
   FundingSource,
@@ -10,6 +11,8 @@ import type {
   Settings,
 } from '@/domain/types';
 
+export { LIMITS };
+
 export const CURRENT_VERSION = 1;
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -19,24 +22,6 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultMinMonths: 1,
   defaultMaxMonths: 3,
 };
-
-/**
- * Upper bounds for data that comes from outside the app (a backup file or the browser storage).
- * Far above any real laboratory, low enough that a hostile file cannot freeze the page.
- */
-export const LIMITS = {
-  areas: 1_000,
-  fundingSources: 1_000,
-  products: 50_000,
-  lots: 200_000,
-  movements: 1_000_000,
-  /** Ids, codes, lot numbers, units… */
-  shortText: 120,
-  /** Names, concepts, reasons. */
-  longText: 1_000,
-  /** Largest quantity (base units) or price accepted in one record. */
-  maxNumber: 1_000_000_000,
-} as const;
 
 const MOVEMENT_TYPES: readonly MovementType[] = [
   'receipt',
@@ -165,10 +150,20 @@ function readArea(record: RawRecord, index: number): Area {
   };
 }
 
+const SOURCE_CODE_RANGE: NumberRange = {
+  integer: true,
+  min: LIMITS.minSourceCode,
+  max: LIMITS.maxSourceCode,
+};
+
 function readFundingSource(record: RawRecord, index: number): FundingSource {
   const where = `Procedencia n.º ${index + 1}`;
-  const code = optionalNumber(record, 'code', { integer: true });
-  if (code === undefined) fail(`${where}: "code" debe ser un número entero no negativo.`);
+  const code = optionalNumber(record, 'code', SOURCE_CODE_RANGE);
+  if (code === undefined) {
+    fail(
+      `${where}: "code" debe ser un número entero entre ${LIMITS.minSourceCode} y ${LIMITS.maxSourceCode}.`,
+    );
+  }
   return { code, name: nonEmptyText(record, 'name', where, LIMITS.longText) };
 }
 
@@ -206,7 +201,7 @@ function readLot(record: RawRecord, index: number): Lot {
     receivedDate: requiredDate(record, 'receivedDate', where),
   };
   return withOptional(lot, {
-    sourceCode: optionalNumber(record, 'sourceCode', { integer: true }),
+    sourceCode: optionalNumber(record, 'sourceCode', SOURCE_CODE_RANGE),
     unitPrice: optionalNumber(record, 'unitPrice'),
   });
 }
@@ -246,7 +241,7 @@ function readMovement(record: RawRecord, index: number): Movement {
   const reason = optionalText(record, 'fefoOverrideReason', LIMITS.longText);
   return withOptional(movement, {
     unitPrice: optionalNumber(record, 'unitPrice'),
-    sourceCode: optionalNumber(record, 'sourceCode', { integer: true }),
+    sourceCode: optionalNumber(record, 'sourceCode', SOURCE_CODE_RANGE),
     fefoOverrideReason: reason?.trim() ? reason : undefined,
   });
 }
@@ -255,8 +250,8 @@ function readMovement(record: RawRecord, index: number): Movement {
 function readSettings(raw: unknown): Settings {
   if (raw === undefined) return { ...DEFAULT_SETTINGS };
   if (!isRecord(raw)) fail('Los ajustes del respaldo no son válidos.');
-  const days = { integer: true, min: 1, max: 3_650 };
-  const months = { integer: true, min: 1, max: 120 };
+  const days = { integer: true, min: 1, max: LIMITS.maxSettingDays };
+  const months = { integer: true, min: 1, max: LIMITS.maxSettingMonths };
 
   const labName = optionalText(raw, 'labName', LIMITS.longText)?.trim();
   let criticalDays = optionalNumber(raw, 'criticalDays', days) ?? DEFAULT_SETTINGS.criticalDays;

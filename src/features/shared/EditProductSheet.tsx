@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { LIMITS } from '@/domain/limits';
 import type { Area, Product } from '@/domain/types';
+import { validateProduct } from '@/domain/validation';
 import { useInventoryStore } from '@/state/store';
 import { Button, NumberField, Select, Sheet, TextField, useToast } from '@/ui';
 import { useFocusFirstInvalid } from './forms';
@@ -11,6 +13,7 @@ interface EditFormProps {
   /** The product being edited; `undefined` creates a new one. */
   product?: Product;
   areas: readonly Area[];
+  products: readonly Product[];
   onClose: () => void;
 }
 
@@ -22,7 +25,7 @@ function withOptional<K extends keyof Product>(product: Product, key: K, value: 
   return next;
 }
 
-function EditForm({ product, areas, onClose }: EditFormProps) {
+function EditForm({ product, areas, products, onClose }: EditFormProps) {
   const toast = useToast();
   const [name, setName] = useState(product?.name ?? '');
   const [areaId, setAreaId] = useState(product?.areaId ?? areas[0]?.id ?? '');
@@ -38,21 +41,30 @@ function EditForm({ product, areas, onClose }: EditFormProps) {
   const [code, setCode] = useState(product?.code ?? '');
   const [cardNumber, setCardNumber] = useState(product?.cardNumber ?? '');
   const [submitted, setSubmitted] = useState(false);
-  /** Errors the store reported (e.g. a duplicate name), shown until the field changes. */
+  /** Errors the store reported (e.g. collection limit), shown until the field changes. */
   const [storeErrors, setStoreErrors] = useState<Record<string, string>>({});
   const { ref: formRef, focusFirstInvalid } = useFocusFirstInvalid();
 
-  const errors: Record<string, string> = {};
-  if (!name.trim()) errors.name = 'Ingresa el nombre del producto.';
-  if (unitsPerPackage !== null && unitsPerPackage < 1) {
-    errors.unitsPerPackage = 'Debe ser al menos 1.';
-  }
-  if (minStock !== null && maxStock !== null && maxStock < minStock) {
-    errors.maxStock = 'El máximo no puede ser menor que el mínimo.';
-  }
   const otherUnit = unit === OTHER_UNIT;
-  if (otherUnit && !customUnit.trim()) errors.unit = 'Escribe la unidad base.';
-  if (!areaId) errors.areaId = 'Elige un área.';
+  const errors = validateProduct(
+    {
+      name,
+      areaId,
+      unit: otherUnit ? customUnit : unit,
+      packaging,
+      unitsPerPackage,
+      minStock,
+      maxStock,
+      avgMonthlyConsumption: avg,
+      code,
+      cardNumber,
+    },
+    {
+      areas,
+      products,
+      ...(product ? { existingId: product.id } : {}),
+    },
+  );
   const shown = (field: string) => (submitted ? errors[field] : undefined) ?? storeErrors[field];
 
   const units = BASE_UNITS.includes(unit) || otherUnit ? BASE_UNITS : [...BASE_UNITS, unit];
@@ -78,17 +90,18 @@ function EditForm({ product, areas, onClose }: EditFormProps) {
     next = withOptional(next, 'avgMonthlyConsumption', avg);
     next = withOptional(next, 'code', code.trim());
     next = withOptional(next, 'cardNumber', cardNumber.trim());
-    if (product) {
-      useInventoryStore.getState().upsertProduct(next);
-    } else {
-      const draft: Partial<Product> = { ...next };
-      delete draft.id;
-      const result = useInventoryStore.getState().addProduct(draft as Omit<Product, 'id'>);
-      if (!result.ok) {
-        setStoreErrors(result.errors);
-        focusFirstInvalid();
-        return;
-      }
+
+    const result = product
+      ? useInventoryStore.getState().upsertProduct(next)
+      : (() => {
+          const draft: Partial<Product> = { ...next };
+          delete draft.id;
+          return useInventoryStore.getState().addProduct(draft as Omit<Product, 'id'>);
+        })();
+    if (!result.ok) {
+      setStoreErrors(result.errors);
+      focusFirstInvalid();
+      return;
     }
     onClose();
     toast.show({
@@ -101,6 +114,7 @@ function EditForm({ product, areas, onClose }: EditFormProps) {
       <TextField
         label="Nombre"
         value={name}
+        maxLength={LIMITS.longText}
         onChange={(value) => {
           setName(value);
           setStoreErrors({});
@@ -134,6 +148,7 @@ function EditForm({ product, areas, onClose }: EditFormProps) {
             label="Otra unidad base"
             value={customUnit}
             onChange={setCustomUnit}
+            maxLength={LIMITS.shortText}
             error={shown('unit')}
             help="Por ejemplo: vial, kit, litro."
           />
@@ -142,20 +157,30 @@ function EditForm({ product, areas, onClose }: EditFormProps) {
           label="Presentación"
           value={packaging}
           onChange={setPackaging}
+          maxLength={LIMITS.shortText}
+          error={shown('packaging')}
           help="Caja, vial, set, frasco…"
         />
         <NumberField
           label="Unidades por presentación"
           value={unitsPerPackage}
           onChange={setUnitsPerPackage}
+          max={LIMITS.maxNumber}
           error={shown('unitsPerPackage')}
           help="Por ejemplo 24 pruebas por caja."
         />
-        <NumberField label="Existencia mínima" value={minStock} onChange={setMinStock} />
+        <NumberField
+          label="Existencia mínima"
+          value={minStock}
+          onChange={setMinStock}
+          max={LIMITS.maxNumber}
+          error={shown('minStock')}
+        />
         <NumberField
           label="Existencia máxima"
           value={maxStock}
           onChange={setMaxStock}
+          max={LIMITS.maxNumber}
           error={shown('maxStock')}
         />
       </div>
@@ -163,11 +188,25 @@ function EditForm({ product, areas, onClose }: EditFormProps) {
         label="Consumo promedio mensual (manual)"
         value={avg}
         onChange={setAvg}
+        max={LIMITS.maxNumber}
+        error={shown('avgMonthlyConsumption')}
         help="Se usa mientras no haya un mes de salidas registradas; después se calcula solo. Si dejas vacíos el mínimo y el máximo, se estiman a partir de este valor."
       />
       <div className="grid grid-cols-1 gap-4 sheet:grid-cols-2">
-        <TextField label="Código" value={code} onChange={setCode} />
-        <TextField label="N.º de tarjeta" value={cardNumber} onChange={setCardNumber} />
+        <TextField
+          label="Código"
+          value={code}
+          onChange={setCode}
+          maxLength={LIMITS.shortText}
+          error={shown('code')}
+        />
+        <TextField
+          label="N.º de tarjeta"
+          value={cardNumber}
+          onChange={setCardNumber}
+          maxLength={LIMITS.shortText}
+          error={shown('cardNumber')}
+        />
       </div>
       <div className="flex flex-wrap justify-end gap-2 pt-2">
         <Button type="button" variant="plain" onClick={onClose}>
@@ -189,9 +228,10 @@ interface EditProductSheetProps {
 /** "Editar producto" (or "Nuevo producto" without `product`): name, area, unit, minimum, maximum, manual consumption, package size and identifiers. */
 export function EditProductSheet({ product, open, onClose }: EditProductSheetProps) {
   const areas = useInventoryStore((state) => state.data.areas);
+  const products = useInventoryStore((state) => state.data.products);
   return (
     <Sheet open={open} onClose={onClose} title={product ? 'Editar producto' : 'Nuevo producto'}>
-      <EditForm product={product} areas={areas} onClose={onClose} />
+      <EditForm product={product} areas={areas} products={products} onClose={onClose} />
     </Sheet>
   );
 }

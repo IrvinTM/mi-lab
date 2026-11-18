@@ -344,6 +344,10 @@ describe('inventory actions on the detail page', () => {
       renderPage();
       await user.click(screen.getByRole('button', { name: 'Editar' }));
       const dialog = screen.getByRole('dialog', { name: 'Editar producto' });
+      expect(within(dialog).getByLabelText('Nombre')).toHaveAttribute('maxlength', '1000');
+      expect(within(dialog).getByLabelText('Presentación')).toHaveAttribute('maxlength', '120');
+      expect(within(dialog).getByLabelText('Código')).toHaveAttribute('maxlength', '120');
+      expect(within(dialog).getByLabelText('N.º de tarjeta')).toHaveAttribute('maxlength', '120');
       await user.type(within(dialog).getByLabelText('Nombre'), ' X');
       await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
       expect(state().products[0]!.name).toBe('Glucosa');

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { LIMITS } from '@/domain/limits';
+import { MAX_ADJUSTMENT_REASON } from '@/domain/validation';
 import { formatQuantity } from '@/lib/format';
 import { useInventoryStore } from '@/state/store';
 import { Button, NumberField, Select, TextField, useToast } from '@/ui';
@@ -56,6 +58,7 @@ export function AdjustForm({ target, onClose }: { target: AdjustTarget; onClose:
         label="Cantidad"
         value={quantity}
         onChange={setQuantity}
+        max={LIMITS.maxNumber}
         error={errors.quantity}
         autoFocus
       />
@@ -63,6 +66,7 @@ export function AdjustForm({ target, onClose }: { target: AdjustTarget; onClose:
         label="Motivo"
         value={reason}
         onChange={setReason}
+        maxLength={MAX_ADJUSTMENT_REASON}
         help="Por ejemplo: conteo físico, frasco dañado."
         error={errors.reason}
       />

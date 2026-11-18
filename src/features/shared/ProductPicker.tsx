@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from 'react';
+import { LIMITS } from '@/domain/limits';
 import type { Product } from '@/domain/types';
 import { TextField } from '@/ui';
 import { normalizeText } from '@/domain/text';
@@ -40,6 +41,7 @@ export function ProductPicker({
       <TextField
         label={label}
         value={text}
+        maxLength={LIMITS.longText}
         list={listId}
         autoComplete="off"
         autoFocus={autoFocus}

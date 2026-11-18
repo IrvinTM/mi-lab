@@ -5,15 +5,22 @@ import { LocalStorageRepository } from '@/data/localStorageRepository';
 import type { InventoryRepository } from '@/data/repository';
 import { todayISO } from '@/domain/dates';
 import { allocateFefo, firstFefoLot } from '@/domain/fefo';
+import { LIMITS } from '@/domain/limits';
 import { lotBalance, lotBalances, productStock } from '@/domain/stock';
-import { normalizeText } from '@/domain/text';
 import type { InventoryData, ISODate, Movement, Product, Settings } from '@/domain/types';
 import {
+  ADJUSTMENT_CONCEPT_PREFIX,
   findExistingLot,
   isValid,
   normalizeLotNumber,
+  validateAdjustment,
+  validateAreaName,
+  validateFundingSourceCode,
+  validateFundingSourceName,
   validateIssue,
+  validateProduct,
   validateReceipt,
+  validateSettings,
 } from '@/domain/validation';
 import { newId as randomId } from './id';
 import { currentToday } from './today';
@@ -74,7 +81,7 @@ export interface InventoryState {
   writeOffExpired(lotId: string): ActionResult<{ movementIds: string[] }>;
   /** Deletes those movements and the lots left without movements. False if it would leave a negative balance. */
   undo(movementIds: string[]): boolean;
-  upsertProduct(product: Product): void;
+  upsertProduct(product: Product): ActionResult;
   /** Creates a product with a new id. Names are unique within an area (ignoring case and accents). */
   addProduct(draft: Omit<Product, 'id'>): ActionResult<{ productId: string }>;
   /** Names are unique ignoring case and accents. */
@@ -87,7 +94,7 @@ export interface InventoryState {
   renameFundingSource(code: number, name: string): ActionResult;
   /** Only sources no lot or movement refers to can be removed. */
   removeFundingSource(code: number): ActionResult;
-  updateSettings(patch: Partial<Settings>): void;
+  updateSettings(patch: Partial<Settings>): ActionResult;
   /** Async: the demo data is its own chunk, downloaded only when needed. */
   resetToSeed(): Promise<void>;
   /** Deletes everything and leaves the app empty (the production reset). */
@@ -130,32 +137,27 @@ function failure(errors: Record<string, string>): ActionFailure {
   };
 }
 
-/** Why `name` cannot be an area name, or `undefined` if it can. `exceptId` is the area being renamed. */
-function areaNameError(
-  areas: readonly { id: string; name: string }[],
-  name: string,
-  exceptId?: string,
-): string | undefined {
-  if (!name.trim()) return 'Escribe el nombre del área.';
-  const key = normalizeText(name);
-  if (areas.some((a) => a.id !== exceptId && normalizeText(a.name) === key)) {
-    return 'Ya existe un área con ese nombre.';
-  }
-  return undefined;
-}
-
-/** Why `name` cannot be a funding source name, or `undefined` if it can. `exceptCode` is the source being renamed. */
-function sourceNameError(
-  sources: readonly { code: number; name: string }[],
-  name: string,
-  exceptCode?: number,
-): string | undefined {
-  if (!name.trim()) return 'Escribe el nombre de la procedencia.';
-  const key = normalizeText(name);
-  if (sources.some((s) => s.code !== exceptCode && normalizeText(s.name) === key)) {
-    return 'Ya existe una procedencia con ese nombre.';
-  }
-  return undefined;
+/** Rebuilds a `Product` with trimmed strings and without empty/`undefined` optional keys. */
+function cleanProduct(raw: Product): Product {
+  const code = raw.code?.trim();
+  const cardNumber = raw.cardNumber?.trim();
+  const packaging = raw.packaging?.trim();
+  return {
+    id: raw.id.trim(),
+    name: raw.name.trim(),
+    areaId: raw.areaId,
+    unit: raw.unit.trim(),
+    ...(code ? { code } : {}),
+    ...(cardNumber ? { cardNumber } : {}),
+    ...(packaging ? { packaging } : {}),
+    ...(raw.unitsPerPackage !== undefined ? { unitsPerPackage: raw.unitsPerPackage } : {}),
+    ...(raw.minStock !== undefined ? { minStock: raw.minStock } : {}),
+    ...(raw.maxStock !== undefined ? { maxStock: raw.maxStock } : {}),
+    ...(raw.avgMonthlyConsumption !== undefined
+      ? { avgMonthlyConsumption: raw.avgMonthlyConsumption }
+      : {}),
+    ...(raw.archived === true ? { archived: true } : {}),
+  };
 }
 
 export function createInventoryStore(repository: InventoryRepository, options: StoreOptions = {}) {
@@ -231,6 +233,7 @@ export function createInventoryStore(repository: InventoryRepository, options: S
         const check = validateReceipt(input, {
           today: today(),
           lots: data.lots,
+          fundingSources: data.fundingSources,
           settings: data.settings,
           productExists: data.products.some((p) => p.id === input.productId),
         });
@@ -238,6 +241,13 @@ export function createInventoryStore(repository: InventoryRepository, options: S
 
         const lotNumber = normalizeLotNumber(input.lotNumber);
         let lot = findExistingLot(data.lots, input.productId, lotNumber);
+        if (!lot && data.lots.length >= LIMITS.lots) {
+          return failure({ lotNumber: `Se alcanzó el máximo de ${LIMITS.lots} lotes.` });
+        }
+        if (data.movements.length >= LIMITS.movements) {
+          return failure({ quantity: `Se alcanzó el máximo de ${LIMITS.movements} movimientos.` });
+        }
+
         let lots = data.lots;
         if (!lot) {
           lot = {
@@ -311,6 +321,9 @@ export function createInventoryStore(repository: InventoryRepository, options: S
         if (allocations.length === 0) {
           return failure({ quantity: 'No hay saldo disponible para esta salida.' });
         }
+        if (data.movements.length + allocations.length > LIMITS.movements) {
+          return failure({ quantity: `Se alcanzó el máximo de ${LIMITS.movements} movimientos.` });
+        }
 
         const isOverride = Boolean(input.lotId && first && first.lot.id !== input.lotId);
         const movements: Movement[] = allocations.map(({ lotId, quantity }) => {
@@ -338,14 +351,11 @@ export function createInventoryStore(repository: InventoryRepository, options: S
         const { data } = get();
         const lot = data.lots.find((l) => l.id === lotId);
         if (!lot) return failure({ lotId: 'No se encontró el lote.' });
-        const errors: Record<string, string> = {};
-        if (!Number.isInteger(delta) || delta === 0) {
-          errors.quantity = 'El ajuste debe ser un número entero distinto de 0.';
-        } else if (lotBalance(lot, data.movements) + delta < 0) {
-          errors.quantity = 'El ajuste dejaría el saldo del lote en negativo.';
-        }
-        if (!reason.trim()) errors.reason = 'Indica el motivo del ajuste.';
+        const errors = validateAdjustment(delta, reason, lotBalance(lot, data.movements));
         if (Object.keys(errors).length > 0) return failure(errors);
+        if (data.movements.length >= LIMITS.movements) {
+          return failure({ quantity: `Se alcanzó el máximo de ${LIMITS.movements} movimientos.` });
+        }
 
         const movement: Movement = {
           id: newId(),
@@ -354,7 +364,7 @@ export function createInventoryStore(repository: InventoryRepository, options: S
           productId: lot.productId,
           lotId,
           quantity: delta,
-          concept: `Ajuste: ${reason.trim()}`,
+          concept: `${ADJUSTMENT_CONCEPT_PREFIX}${reason.trim()}`,
           createdAt: createdAt(),
         };
         addMovements([movement]);
@@ -370,19 +380,32 @@ export function createInventoryStore(repository: InventoryRepository, options: S
         const balance = lotBalance(lot, data.movements);
         if (balance <= 0) return failure({ lotId: 'Este lote no tiene saldo.' });
 
-        const movement: Movement = {
+        const quantities: number[] = [];
+        let remaining = balance;
+        while (remaining > 0) {
+          const chunk = Math.min(remaining, LIMITS.maxNumber);
+          quantities.push(chunk);
+          remaining -= chunk;
+        }
+        if (data.movements.length + quantities.length > LIMITS.movements) {
+          return failure({ lotId: `Se alcanzó el máximo de ${LIMITS.movements} movimientos.` });
+        }
+
+        const date = today();
+        const stamp = createdAt();
+        const movements: Movement[] = quantities.map((quantity) => ({
           id: newId(),
           type: 'expiry_writeoff',
-          date: today(),
+          date,
           productId: lot.productId,
           lotId,
-          quantity: balance,
+          quantity,
           concept: 'Baja por vencimiento',
-          createdAt: createdAt(),
+          createdAt: stamp,
           ...(lot.unitPrice !== undefined ? { unitPrice: lot.unitPrice } : {}),
-        };
-        addMovements([movement]);
-        return { ok: true, movementIds: [movement.id] };
+        }));
+        addMovements(movements);
+        return { ok: true, movementIds: movements.map((m) => m.id) };
       },
 
       undo(movementIds) {
@@ -393,7 +416,7 @@ export function createInventoryStore(repository: InventoryRepository, options: S
         const lots = data.lots.filter((lot) => withMovements.has(lot.id));
         const next = { ...data, movements, lots };
         for (const balance of lotBalances(next).values()) {
-          if (balance < 0) return false;
+          if (balance < -1e-9) return false;
         }
         setData(next);
         return true;
@@ -401,35 +424,49 @@ export function createInventoryStore(repository: InventoryRepository, options: S
 
       upsertProduct(product) {
         const { data } = get();
-        const exists = data.products.some((p) => p.id === product.id);
+        const id = product.id.trim();
+        const exists = data.products.some((p) => p.id === id);
+        const errors = validateProduct(product, {
+          areas: data.areas,
+          products: data.products,
+          ...(exists ? { existingId: id } : {}),
+        });
+        if (Object.keys(errors).length > 0) return failure(errors);
+        if (!exists && data.products.length >= LIMITS.products) {
+          return failure({ name: `Se alcanzó el máximo de ${LIMITS.products} productos.` });
+        }
+        const clean = cleanProduct(product);
         setData({
           ...data,
           products: exists
-            ? data.products.map((p) => (p.id === product.id ? product : p))
-            : [...data.products, product],
+            ? data.products.map((p) => (p.id === id ? clean : p))
+            : [...data.products, clean],
         });
+        return { ok: true };
       },
 
       addProduct(draft) {
         const { data } = get();
-        const name = draft.name.trim();
-        if (!name) return failure({ name: 'Ingresa el nombre del producto.' });
-        if (!data.areas.some((a) => a.id === draft.areaId)) {
-          return failure({ areaId: 'Elige un área.' });
+        const errors = validateProduct(draft, {
+          areas: data.areas,
+          products: data.products,
+        });
+        if (Object.keys(errors).length > 0) return failure(errors);
+        if (data.products.length >= LIMITS.products) {
+          return failure({ name: `Se alcanzó el máximo de ${LIMITS.products} productos.` });
         }
-        const key = normalizeText(name);
-        if (data.products.some((p) => p.areaId === draft.areaId && normalizeText(p.name) === key)) {
-          return failure({ name: 'Ya existe un producto con ese nombre en esta área.' });
-        }
-        const product: Product = { ...draft, name, id: newId() };
+        const product = cleanProduct({ ...draft, id: newId() });
         setData({ ...data, products: [...data.products, product] });
         return { ok: true, productId: product.id };
       },
 
       addArea(name) {
         const { data } = get();
-        const error = areaNameError(data.areas, name);
+        const error = validateAreaName(data.areas, name);
         if (error) return failure({ name: error });
+        if (data.areas.length >= LIMITS.areas) {
+          return failure({ name: `Se alcanzó el máximo de ${LIMITS.areas} áreas.` });
+        }
         const area = { id: newId(), name: name.trim() };
         setData({ ...data, areas: [...data.areas, area] });
         return { ok: true, areaId: area.id };
@@ -438,17 +475,15 @@ export function createInventoryStore(repository: InventoryRepository, options: S
       addFundingSource(name, code) {
         const { data } = get();
         const errors: Record<string, string> = {};
-        const nameError = sourceNameError(data.fundingSources, name);
+        const nameError = validateFundingSourceName(data.fundingSources, name);
         if (nameError) errors.name = nameError;
-        if (code !== undefined) {
-          if (!Number.isInteger(code) || code < 0 || code > 999_999) {
-            errors.code = 'El código debe ser un número entero entre 0 y 999999.';
-          } else if (data.fundingSources.some((s) => s.code === code)) {
-            errors.code = 'Ya existe una procedencia con ese código.';
-          }
+        else if (data.fundingSources.length >= LIMITS.fundingSources) {
+          errors.name = `Se alcanzó el máximo de ${LIMITS.fundingSources} procedencias.`;
         }
-        if (Object.keys(errors).length > 0) return failure(errors);
         const next = code ?? data.fundingSources.reduce((max, s) => Math.max(max, s.code), 0) + 1;
+        const codeError = validateFundingSourceCode(data.fundingSources, next);
+        if (codeError) errors.code = codeError;
+        if (Object.keys(errors).length > 0) return failure(errors);
         const source = { code: next, name: name.trim() };
         setData({ ...data, fundingSources: [...data.fundingSources, source] });
         return { ok: true, code: next };
@@ -459,7 +494,7 @@ export function createInventoryStore(repository: InventoryRepository, options: S
         if (!data.fundingSources.some((s) => s.code === code)) {
           return failure({ code: 'No se encontró la procedencia.' });
         }
-        const error = sourceNameError(data.fundingSources, name, code);
+        const error = validateFundingSourceName(data.fundingSources, name, code);
         if (error) return failure({ name: error });
         setData({
           ...data,
@@ -490,7 +525,7 @@ export function createInventoryStore(repository: InventoryRepository, options: S
       renameArea(id, name) {
         const { data } = get();
         if (!data.areas.some((a) => a.id === id)) return failure({ id: 'No se encontró el área.' });
-        const error = areaNameError(data.areas, name, id);
+        const error = validateAreaName(data.areas, name, id);
         if (error) return failure({ name: error });
         setData({
           ...data,
@@ -515,7 +550,27 @@ export function createInventoryStore(repository: InventoryRepository, options: S
 
       updateSettings(patch) {
         const { data } = get();
-        setData({ ...data, settings: { ...data.settings, ...patch } });
+        const merged = { ...data.settings, ...patch };
+        const errors = validateSettings({
+          labName: merged.labName,
+          criticalDays: merged.criticalDays,
+          warningDays: merged.warningDays,
+          defaultMinMonths: merged.defaultMinMonths,
+          defaultMaxMonths: merged.defaultMaxMonths,
+          todayOverride: merged.todayOverride,
+        });
+        if (Object.keys(errors).length > 0) return failure(errors as Record<string, string>);
+
+        const next: Settings = {
+          labName: merged.labName.trim(),
+          criticalDays: merged.criticalDays,
+          warningDays: merged.warningDays,
+          defaultMinMonths: merged.defaultMinMonths,
+          defaultMaxMonths: merged.defaultMaxMonths,
+          ...(merged.todayOverride ? { todayOverride: merged.todayOverride } : {}),
+        };
+        setData({ ...data, settings: next });
+        return { ok: true };
       },
 
       async resetToSeed() {
