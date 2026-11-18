@@ -10,6 +10,9 @@
  * `data/migrate.ts` when it loads; here the tables only enforce types (STRICT), required fields
  * and references between records.
  */
+import { chmodSync, mkdirSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { dirname, resolve } from 'node:path';
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
 import type { DbLoadResponse, DbResponse } from './api';
 
@@ -17,6 +20,8 @@ import type { DbLoadResponse, DbResponse } from './api';
 type JsonRecord = Record<string, unknown>;
 
 export const DB_FILE_NAME = 'mi-lab.db';
+export const DB_DIR_MODE = 0o700;
+export const DB_FILE_MODE = 0o600;
 /** Same limit as a backup: far above a real inventory (≈ 80,000 movements). */
 export const MAX_SAVE_BYTES = 20 * 1024 * 1024;
 
@@ -424,11 +429,50 @@ export class InventoryDb {
   }
 }
 
+const DB_SIDE_FILES = ['', '-wal', '-shm', '-journal'] as const;
+
+const isSpecialDbPath = (file: string): boolean =>
+  !file || file === ':memory:' || file.startsWith('file:');
+
+function ensureDbDir(file: string): void {
+  if (isSpecialDbPath(file)) return;
+  const dir = dirname(file);
+  mkdirSync(dir, { recursive: true, mode: DB_DIR_MODE });
+  const resolved = resolve(dir);
+  if (
+    resolved !== '/' &&
+    resolved !== resolve('.') &&
+    resolved !== resolve(tmpdir()) &&
+    resolved !== resolve(homedir())
+  ) {
+    try {
+      chmodSync(dir, DB_DIR_MODE);
+    } catch {
+      // Ignore on platforms or filesystems where POSIX directory modes do not apply.
+    }
+  }
+}
+
+function hardenDbFilePermissions(file: string): void {
+  if (isSpecialDbPath(file)) return;
+  for (const suffix of DB_SIDE_FILES) {
+    try {
+      chmodSync(`${file}${suffix}`, DB_FILE_MODE);
+    } catch {
+      // Sidecar may not exist yet, or chmod is unsupported/no-op on the filesystem.
+    }
+  }
+}
+
 /** Opens (creating if needed) the database file and brings its schema up to date. */
 export function openInventoryDb(file: string): InventoryDb {
+  ensureDbDir(file);
   const db = new DatabaseSync(file);
+  hardenDbFilePermissions(file);
   try {
-    return new InventoryDb(db);
+    const inventory = new InventoryDb(db);
+    hardenDbFilePermissions(file);
+    return inventory;
   } catch (error) {
     db.close();
     throw error;

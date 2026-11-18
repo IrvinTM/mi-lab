@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { extname, join, sep } from 'node:path';
+import { join, sep } from 'node:path';
 import {
   app,
   BrowserWindow,
@@ -23,7 +23,15 @@ import {
   type DbLoadResponse,
   type DbResponse,
 } from './api';
-import { forbiddenSwitch, isAllowedRequest, isAppUrl, mimeType, SECURITY_HEADERS } from './network';
+import {
+  configureDownload,
+  forbiddenSwitch,
+  HOST_RESOLVER_RULES,
+  isAllowedRequest,
+  isAppUrl,
+  mimeType,
+  SECURITY_HEADERS,
+} from './network';
 import { resolveAppPath } from './appProtocol';
 import { backupStatus, backupTextError, saveAutoBackup } from './backups';
 import {
@@ -64,6 +72,8 @@ protocol.registerSchemesAsPrivileged([
 // language Chromium would look for that locale's strings, and without them the native file
 // dialogs ("Restaurar respaldo", "Guardar como") silently fail to open. Always use es-419.
 app.commandLine.appendSwitch('lang', 'es-419');
+// Block DNS pre-resolution and any non-app host lookup below webRequest while allowing app://mi-lab.
+app.commandLine.appendSwitch('host-resolver-rules', HOST_RESOLVER_RULES);
 
 app.setAppUserModelId('sv.mi-lab.app');
 // Every renderer runs in the Chromium sandbox, whatever its webPreferences say.
@@ -101,8 +111,21 @@ function readWindowState(): WindowState | undefined {
 
 function writeWindowState(window: BrowserWindow): void {
   try {
+    const userData = app.getPath('userData');
+    mkdirSync(userData, { recursive: true, mode: 0o700 });
+    try {
+      chmodSync(userData, 0o700);
+    } catch {
+      // Ignore on platforms where POSIX directory modes do not apply.
+    }
     const state: WindowState = { ...window.getNormalBounds(), maximized: window.isMaximized() };
-    writeFileSync(windowStateFile(), JSON.stringify(state));
+    const file = windowStateFile();
+    writeFileSync(file, JSON.stringify(state), { mode: 0o600 });
+    try {
+      chmodSync(file, 0o600);
+    } catch {
+      // Ignore on platforms where chmod is a no-op.
+    }
   } catch {
     // Not remembering the window position is harmless.
   }
@@ -153,17 +176,9 @@ function start(): void {
   session.defaultSession.setPermissionCheckHandler(() => false);
 
   // No handler sets a save path, so Electron shows the native "Guardar como" dialog for the
-  // backup (.json) and report (.xlsx) downloads. Only the title (otherwise the blob: URL on Linux)
-  // and the file-type filter are added here.
+  // backup (.json) and report (.xlsx) downloads; any other extension is cancelled.
   session.defaultSession.on('will-download', (_event, item) => {
-    const extension = extname(item.getFilename()).toLowerCase();
-    const filters =
-      extension === '.xlsx'
-        ? [{ name: 'Libro de Excel', extensions: ['xlsx'] }]
-        : extension === '.json'
-          ? [{ name: 'Respaldo de Mi-lab', extensions: ['json'] }]
-          : [];
-    item.setSaveDialogOptions({ title: 'Guardar como', filters });
+    configureDownload(item);
   });
 
   openDatabase();
@@ -254,6 +269,8 @@ function flushBeforeClose(window: BrowserWindow): void {
  */
 function hardenWebContents(): void {
   app.on('web-contents-created', (_event, contents) => {
+    // Block WebRTC STUN/UDP traffic, which does not pass through session.webRequest.
+    contents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp');
     contents.setWindowOpenHandler(() => ({ action: 'deny' }));
     const stayInApp = (event: { preventDefault(): void }, url: string) => {
       if (!isAppUrl(url)) event.preventDefault();

@@ -199,6 +199,15 @@ form-action 'none'`. No hace falta `'unsafe-inline'`: no hay `<script>` ni `<sty
 - **[Low · pendiente] S11. Datos sin cifrar en el navegador.** Cualquiera con acceso al equipo (o
   una extensión con permisos) puede leer y modificar `localStorage`. Aceptable en el MVP de un solo
   equipo; ver recomendaciones.
+- **[Low · corregido] S12. Defensa en profundidad en Electron (Issue #4).** En `electron/` se
+  serializan los guardados de respaldo automático (`saveAutoBackup`) con sufijo `.tmp` único y se
+  exige `version === 1` más las cinco listas principales en `backupTextError`; las carpetas de
+  datos/respaldos se crean y ajustan con modo `0o700` y los archivos (`mi-lab.db`, `-wal`, `-shm`,
+  respaldos y temporales) con `0o600` en POSIX; `will-download` cancela cualquier extensión distinta
+  de `.json` o `.xlsx`; se amplía `FORBIDDEN_SWITCHES` (`--no-sandbox`, `--disable-web-security`,
+  `--renderer-cmd-prefix`, `--gpu-launcher`, `--utility-cmd-prefix`, `--browser-subprocess-path`) y
+  se fijan `setWebRTCIPHandlingPolicy('disable_non_proxied_udp')` y `host-resolver-rules` (`MAP *
+~NOTFOUND , EXCLUDE mi-lab`) para cubrir UDP/STUN y DNS fuera de `webRequest`.
 - **Sin hallazgos:** no hay `dangerouslySetInnerHTML`, `innerHTML`, `eval`, `new Function` ni
   `target="_blank"`; todos los `href` se construyen con rutas fijas + `encodeURIComponent`, así que
   no puede colarse `javascript:`; `?producto=` y `?lote=` solo se usan si coinciden con un id
