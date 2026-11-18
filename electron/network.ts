@@ -1,4 +1,4 @@
-import { posix } from 'node:path';
+import { extname, posix } from 'node:path';
 import { APP_ORIGIN } from './api';
 
 /**
@@ -89,9 +89,16 @@ export function mimeType(relativePath: string): string | undefined {
 }
 
 /**
+ * Chromium host-resolver rule blocking DNS lookups (including pre-resolution that bypasses
+ * `webRequest`) while excluding the app's own `app://mi-lab` host.
+ */
+export const HOST_RESOLVER_RULES = `MAP * ~NOTFOUND , EXCLUDE ${APP_HOST}`;
+
+/**
  * Command-line switches that would let another program drive or inspect the installed app
- * (Chrome DevTools Protocol over a port or pipe, V8 flags). The Node --inspect switches are
- * already disabled by the fuses; these are Chromium's.
+ * (Chrome DevTools Protocol over a port or pipe, V8 flags), weaken sandbox/origin isolation, or
+ * launch arbitrary helper processes. The Node --inspect switches are already disabled by the
+ * fuses; these are Chromium's.
  */
 export const FORBIDDEN_SWITCHES = [
   'remote-debugging-port',
@@ -99,9 +106,48 @@ export const FORBIDDEN_SWITCHES = [
   'remote-debugging-address',
   'remote-allow-origins',
   'js-flags',
+  'no-sandbox',
+  'disable-web-security',
+  'renderer-cmd-prefix',
+  'gpu-launcher',
+  'utility-cmd-prefix',
+  'browser-subprocess-path',
 ] as const;
 
 /** The first forbidden switch present, if any. */
 export function forbiddenSwitch(hasSwitch: (name: string) => boolean): string | undefined {
   return FORBIDDEN_SWITCHES.find((name) => hasSwitch(name));
+}
+
+export interface DownloadableItem {
+  getFilename(): string;
+  setSaveDialogOptions(options: {
+    title: string;
+    filters: { name: string; extensions: string[] }[];
+  }): void;
+  cancel(): void;
+}
+
+/**
+ * Allows only the two file types the app exports (.json backup, .xlsx report) and sets the save
+ * dialog filter; cancels any other download.
+ */
+export function configureDownload(item: DownloadableItem): boolean {
+  const extension = extname(item.getFilename()).toLowerCase();
+  if (extension === '.xlsx') {
+    item.setSaveDialogOptions({
+      title: 'Guardar como',
+      filters: [{ name: 'Libro de Excel', extensions: ['xlsx'] }],
+    });
+    return true;
+  }
+  if (extension === '.json') {
+    item.setSaveDialogOptions({
+      title: 'Guardar como',
+      filters: [{ name: 'Respaldo de Mi-lab', extensions: ['json'] }],
+    });
+    return true;
+  }
+  item.cancel();
+  return false;
 }

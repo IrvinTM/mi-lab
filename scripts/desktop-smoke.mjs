@@ -213,8 +213,16 @@ check(
 );
 const status = await ev('window.miLabDesktop.backup(null)');
 check('IPC backup status accepted (origin check)', status?.ok === true, JSON.stringify(status));
-const save = await ev(`window.miLabDesktop.backup(JSON.stringify({version:1,smoke:true}))`);
+const save = await ev(`window.miLabDesktop.backup(${JSON.stringify(JSON.stringify(nul))})`);
 check('IPC backup save', save?.ok === true && !!save.status?.lastFile, JSON.stringify(save));
+const incompleteBackup = await ev(
+  `window.miLabDesktop.backup(JSON.stringify({version:1,smoke:true}))`,
+);
+check(
+  'IPC backup rejects incomplete data',
+  incompleteBackup?.ok === false,
+  JSON.stringify(incompleteBackup),
+);
 const bad = await ev(`window.miLabDesktop.backup('x'.repeat(10))`);
 check('IPC rejects invalid JSON', bad?.ok === false, JSON.stringify(bad));
 for (const url of [

@@ -1,6 +1,6 @@
 // @vitest-environment node
 /// <reference types="node" />
-import { mkdtemp, rm } from 'node:fs/promises';
+import { chmod, mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -10,6 +10,8 @@ import type { InventoryData } from '@/domain/types';
 import { largeData } from '@/test/largeData';
 import {
   clearRequest,
+  DB_DIR_MODE,
+  DB_FILE_MODE,
   InventoryDb,
   loadRequest,
   MAX_SAVE_BYTES,
@@ -237,6 +239,32 @@ describe('schema', () => {
     expect(after.get('PRAGMA user_version').user_version).toBe(SCHEMA_VERSION + 1);
     after.close();
   });
+
+  it.skipIf(process.platform === 'win32')(
+    'creates the database folder with 0700 and sets 0600 on the database and WAL/SHM files',
+    async () => {
+      const nestedDir = join(dir, 'userData');
+      const nestedFile = join(nestedDir, 'mi-lab.db');
+      const db = open(nestedFile);
+      db.save(small());
+      expect((await stat(nestedDir)).mode & 0o777).toBe(DB_DIR_MODE);
+      for (const suffix of ['', '-wal', '-shm']) {
+        expect((await stat(`${nestedFile}${suffix}`)).mode & 0o777).toBe(DB_FILE_MODE);
+      }
+
+      // Pre-existing lax permissions on folder and files are tightened when reopened.
+      await chmod(nestedDir, 0o755);
+      for (const suffix of ['', '-wal', '-shm']) {
+        await chmod(`${nestedFile}${suffix}`, 0o644);
+      }
+      const reopened = open(nestedFile);
+      expect(reopened.load()).toStrictEqual(small());
+      expect((await stat(nestedDir)).mode & 0o777).toBe(DB_DIR_MODE);
+      for (const suffix of ['', '-wal', '-shm']) {
+        expect((await stat(`${nestedFile}${suffix}`)).mode & 0o777).toBe(DB_FILE_MODE);
+      }
+    },
+  );
 });
 
 describe('round trip', () => {

@@ -1,8 +1,10 @@
 // @vitest-environment node
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  BACKUP_DIR_MODE,
+  BACKUP_FILE_MODE,
   backupFileName,
   backupStatus,
   backupTextError,
@@ -11,6 +13,24 @@ import {
   MAX_COPIES,
   saveAutoBackup,
 } from './backups';
+
+const validBackup = (overrides: Record<string, unknown> = {}) =>
+  JSON.stringify({
+    version: 1,
+    areas: [],
+    fundingSources: [],
+    products: [],
+    lots: [],
+    movements: [],
+    settings: {
+      labName: 'Laboratorio',
+      criticalDays: 30,
+      warningDays: 90,
+      defaultMinMonths: 1,
+      defaultMaxMonths: 3,
+    },
+    ...overrides,
+  });
 
 const day = (n: number) =>
   `mi-lab-respaldo-2026-${String(Math.floor(n / 28) + 1).padStart(2, '0')}-${String((n % 28) + 1).padStart(2, '0')}.json`;
@@ -37,12 +57,38 @@ describe('filesToDelete', () => {
 });
 
 describe('backupTextError', () => {
-  it('accepts a JSON object', () => {
-    expect(backupTextError('{"version":1}')).toBeUndefined();
+  it('accepts a valid v1 backup with all main lists', () => {
+    expect(backupTextError(validBackup())).toBeUndefined();
+    const withoutSettings = JSON.parse(validBackup()) as Record<string, unknown>;
+    delete withoutSettings.settings;
+    expect(backupTextError(JSON.stringify(withoutSettings))).toBeUndefined();
   });
 
-  it.each(['', 42, '[1]', 'null', '{'])('rejects %j', (text) => {
+  it.each(['', 42, '[1]', 'null', '{', '{}', '{"version":1}'])('rejects %j', (text) => {
     expect(backupTextError(text)).toBeTypeOf('string');
+  });
+
+  it.each([0, 2, '1', null, undefined])('rejects unsupported version %j', (version) => {
+    const raw = JSON.parse(validBackup()) as Record<string, unknown>;
+    if (version === undefined) delete raw.version;
+    else raw.version = version;
+    expect(backupTextError(JSON.stringify(raw))).toBeTypeOf('string');
+  });
+
+  it.each(['areas', 'fundingSources', 'products', 'lots', 'movements'] as const)(
+    'rejects backup missing or with non-array "%s"',
+    (key) => {
+      const missing = JSON.parse(validBackup()) as Record<string, unknown>;
+      delete missing[key];
+      expect(backupTextError(JSON.stringify(missing))).toBeTypeOf('string');
+      expect(backupTextError(validBackup({ [key]: {} }))).toBeTypeOf('string');
+      expect(backupTextError(validBackup({ [key]: null }))).toBeTypeOf('string');
+      expect(backupTextError(validBackup({ [key]: '[]' }))).toBeTypeOf('string');
+    },
+  );
+
+  it.each([null, [], 'x', 7])('rejects invalid settings %j when present', (settings) => {
+    expect(backupTextError(validBackup({ settings }))).toBeTypeOf('string');
   });
 
   it('rejects text over the size limit', () => {
@@ -93,6 +139,43 @@ describe('saveAutoBackup', () => {
     expect(files).toContain('mi-lab-respaldo-2026-11-15.json');
     expect(await readdir(dir)).toContain('notas.txt');
   });
+
+  it('serializes concurrent calls without temporary-file collisions and keeps the queue alive after an error', async () => {
+    const payloads = Array.from({ length: 12 }, (_, i) => JSON.stringify({ step: i }));
+    const results = await Promise.all(payloads.map((payload) => saveAutoBackup(dir, payload, NOW)));
+    expect(results).toHaveLength(payloads.length);
+    expect(await readdir(dir)).toEqual(['mi-lab-respaldo-2026-11-15.json']);
+    expect(await readFile(join(dir, 'mi-lab-respaldo-2026-11-15.json'), 'utf8')).toBe(
+      payloads.at(-1),
+    );
+
+    // A regular file blocking mkdir causes one queued call to reject; the next call still runs.
+    const blocker = join(dir, 'archivo');
+    await writeFile(blocker, 'x');
+    const failing = saveAutoBackup(join(blocker, 'sub'), '{"bad":1}', NOW);
+    const after = saveAutoBackup(dir, '{"recovered":true}', NOW);
+    await expect(failing).rejects.toThrow();
+    const status = await after;
+    expect(await readFile(status.lastFile!, 'utf8')).toBe('{"recovered":true}');
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'creates folders with mode 0700 and backup files with mode 0600 on POSIX',
+    async () => {
+      const nested = join(dir, 'Mi-lab', 'Respaldos');
+      const status = await saveAutoBackup(nested, '{"a":1}', NOW);
+      expect((await stat(join(dir, 'Mi-lab'))).mode & 0o777).toBe(BACKUP_DIR_MODE);
+      expect((await stat(nested)).mode & 0o777).toBe(BACKUP_DIR_MODE);
+      expect((await stat(status.lastFile!)).mode & 0o777).toBe(BACKUP_FILE_MODE);
+
+      // Existing lax permissions from an older version are tightened on the next write.
+      await chmod(nested, 0o755);
+      await chmod(status.lastFile!, 0o644);
+      const updated = await saveAutoBackup(nested, '{"a":2}', NOW);
+      expect((await stat(nested)).mode & 0o777).toBe(BACKUP_DIR_MODE);
+      expect((await stat(updated.lastFile!)).mode & 0o777).toBe(BACKUP_FILE_MODE);
+    },
+  );
 });
 
 describe('backupStatus', () => {

@@ -1,8 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  configureDownload,
   CONTENT_SECURITY_POLICY,
+  FORBIDDEN_SWITCHES,
   forbiddenSwitch,
+  HOST_RESOLVER_RULES,
   isAllowedRequest,
   isAppUrl,
   mimeType,
@@ -72,12 +75,69 @@ describe('desktop network isolation', () => {
     expect(mimeType('noext')).toBeUndefined();
   });
 
-  it('detects remote-debugging switches', () => {
+  it('detects remote-debugging, sandbox-weakening and subprocess-launcher switches', () => {
     const has = (present: string[]) => (name: string) => present.includes(name);
     expect(forbiddenSwitch(has([]))).toBeUndefined();
-    expect(forbiddenSwitch(has(['lang']))).toBeUndefined();
-    expect(forbiddenSwitch(has(['remote-debugging-port']))).toBe('remote-debugging-port');
-    expect(forbiddenSwitch(has(['remote-debugging-pipe']))).toBe('remote-debugging-pipe');
-    expect(forbiddenSwitch(has(['js-flags']))).toBe('js-flags');
+    expect(forbiddenSwitch(has(['lang', 'host-resolver-rules']))).toBeUndefined();
+    expect(FORBIDDEN_SWITCHES).toEqual([
+      'remote-debugging-port',
+      'remote-debugging-pipe',
+      'remote-debugging-address',
+      'remote-allow-origins',
+      'js-flags',
+      'no-sandbox',
+      'disable-web-security',
+      'renderer-cmd-prefix',
+      'gpu-launcher',
+      'utility-cmd-prefix',
+      'browser-subprocess-path',
+    ]);
+    for (const name of FORBIDDEN_SWITCHES) {
+      expect(forbiddenSwitch(has([name]))).toBe(name);
+    }
+  });
+
+  it('defines host-resolver rules blocking outside DNS while excluding mi-lab', () => {
+    expect(HOST_RESOLVER_RULES).toBe('MAP * ~NOTFOUND , EXCLUDE mi-lab');
+  });
+
+  it('allows only .json and .xlsx downloads and cancels everything else', () => {
+    const makeItem = (filename: string) => ({
+      getFilename: () => filename,
+      setSaveDialogOptions: vi.fn(),
+      cancel: vi.fn(),
+    });
+
+    const json = makeItem('mi-lab-respaldo-2026-11-18.JSON');
+    expect(configureDownload(json)).toBe(true);
+    expect(json.cancel).not.toHaveBeenCalled();
+    expect(json.setSaveDialogOptions).toHaveBeenCalledWith({
+      title: 'Guardar como',
+      filters: [{ name: 'Respaldo de Mi-lab', extensions: ['json'] }],
+    });
+
+    const xlsx = makeItem('existencias-octubre.xlsx');
+    expect(configureDownload(xlsx)).toBe(true);
+    expect(xlsx.cancel).not.toHaveBeenCalled();
+    expect(xlsx.setSaveDialogOptions).toHaveBeenCalledWith({
+      title: 'Guardar como',
+      filters: [{ name: 'Libro de Excel', extensions: ['xlsx'] }],
+    });
+
+    for (const bad of [
+      'payload.exe',
+      'pagina.html',
+      'script.js',
+      'tabla.csv',
+      'viejo.xls',
+      'respaldo.json.exe',
+      'sin-extension',
+      '',
+    ]) {
+      const item = makeItem(bad);
+      expect(configureDownload(item)).toBe(false);
+      expect(item.cancel).toHaveBeenCalledTimes(1);
+      expect(item.setSaveDialogOptions).not.toHaveBeenCalled();
+    }
   });
 });
