@@ -23,7 +23,7 @@ Todos los High y los Medium baratos quedaron corregidos y con test; lo pendiente
 | --------- | ----------- | ---------- | ---------- | -------------------- |
 | Critical  | 0           | 0          | 0          | 0                    |
 | High      | 4           | 4          | 0          | 0                    |
-| Medium    | 8           | 6          | 2          | 0                    |
+| Medium    | 8           | 7          | 1          | 0                    |
 | Low       | 14          | 5          | 5          | 4                    |
 
 Números clave (antes → después):
@@ -175,17 +175,17 @@ form-action 'none'`. No hace falta `'unsafe-inline'`: no hay `<script>` ni `<sty
 - **[Medium · corregido] S6. Carga de respaldo sin límite de tamaño.** Un archivo enorme se leía
   completo en memoria. `src/state/backup.ts` rechaza archivos vacíos o > 20 MB **antes de leerlos**
   y valida antes de pedir confirmación; `accept` incluye `.json`.
-- **[Medium · pendiente, entorno] S7. `server.allowedHosts: true` en el `main` original** (cambio sin
-  commitear puesto por el entorno para usar túneles tipo trycloudflare; no se tocó). Desactiva la
-  comprobación de `Host` de Vite, que es su defensa contra **DNS rebinding**: una web maliciosa
-  podría leer el servidor de desarrollo desde el navegador de quien lo tenga abierto. Y con un túnel
-  público, cualquiera con la URL ve el **código fuente completo** (incluido `docs/seed`, con el
-  inventario real del laboratorio) y queda expuesto a fallos del servidor de desarrollo (Vite ha
-  tenido CVE de lectura de archivos fuera del proyecto vía `/@fs/` y `?raw`). Recomendación: no
-  commitearlo; si hace falta un túnel, usar una lista explícita (`allowedHosts:
-['.trycloudflare.com']`) solo mientras se usa, preferir `pnpm run build && pnpm run preview`
-  (con `preview.allowedHosts` acotado) para enseñar la app, cerrar el túnel al terminar y mantener
-  Vite actualizado. Nunca `server.fs.strict: false`.
+- **[Medium · corregido] S7. `server.allowedHosts: true` en `vite.config.ts`.** Desactivaba por
+  defecto la comprobación de `Host` de Vite, que es su defensa contra **DNS rebinding**: una web
+  maliciosa podría leer el servidor de desarrollo desde el navegador de quien lo tenga abierto. Y
+  con un túnel público, cualquiera con la URL ve el **código fuente completo** (incluido
+  `docs/seed`, con el inventario real del laboratorio) y queda expuesto a fallos del servidor de
+  desarrollo (Vite ha tenido CVE de lectura de archivos fuera del proyecto vía `/@fs/` y `?raw`).
+  Ahora la comprobación de `Host` por defecto de Vite permanece activa; el acceso puntual por túnel
+  solo se habilita de forma explícita con `VITE_TUNNEL_HOSTS=1` (`allowedHosts:
+['.trycloudflare.com']`). Si se usa un túnel, preferir `pnpm run build && pnpm run preview` (con
+  `preview.allowedHosts` acotado) para enseñar la app, cerrar el túnel al terminar y mantener Vite
+  actualizado. Nunca `server.fs.strict: false`.
 - **[Low · corregido] S8.** `URL.revokeObjectURL` se llamaba en el mismo tick que `click()`, lo que
   en algunos navegadores cancela la descarga: ahora se revoca después (`features/shared/download.ts`,
   compartido por el respaldo y la descarga de datos ilegibles).

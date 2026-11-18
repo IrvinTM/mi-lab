@@ -40,8 +40,8 @@ function contentSecurityPolicy(): Plugin {
 export default defineConfig({
   plugins: [react(), tailwindcss(), contentSecurityPolicy()],
   server: {
-    // Allow dev-server access through tunnels (e.g. trycloudflare.com)
-    allowedHosts: true,
+    // Keep Vite's default Host check on; opt in to tunnel access only via VITE_TUNNEL_HOSTS=1.
+    ...(process.env.VITE_TUNNEL_HOSTS === '1' ? { allowedHosts: ['.trycloudflare.com'] } : {}),
   },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },

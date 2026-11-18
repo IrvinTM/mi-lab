@@ -66,7 +66,7 @@ linux:
   category: Office
   executableName: mi-lab
   syncDesktopName: true
-  maintainer: Mi-lab <irvint698@gmail.com>
+  maintainer: Mi-lab <IrvinTM@users.noreply.github.com>
   synopsis: Control de inventario de reactivos de laboratorio clínico
 # New static AppImage runtime: it needs no libfuse2, which Ubuntu 22.04+ no longer installs
 # (the legacy runtime fails there with "dlopen(): error loading libfuse.so.2").

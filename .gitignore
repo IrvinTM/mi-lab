@@ -27,3 +27,7 @@ pnpm-debug.log*
 Thumbs.db
 !.env.development
 !.env.test
+
+# Production inventory data and physical count sheets (never commit)
+docs/prod/
+*.csv
