@@ -1,6 +1,15 @@
 import { daysUntil, isValidISODate } from './dates';
+import { LIMITS } from './limits';
 import { countNoun } from './plural';
-import type { ISODate, Lot, Settings } from './types';
+import { normalizeText } from './text';
+import type { Area, FundingSource, ISODate, Lot, Product, Settings } from './types';
+
+export { LIMITS };
+
+export const ADJUSTMENT_CONCEPT_PREFIX = 'Ajuste: ';
+export const MAX_ADJUSTMENT_REASON = LIMITS.longText - ADJUSTMENT_CONCEPT_PREFIX.length;
+
+const MAX_NUMBER_TEXT = new Intl.NumberFormat('es-SV').format(LIMITS.maxNumber);
 
 /** Messages are Spanish and ready to show; keys are form field names. */
 export interface ValidationResult {
@@ -43,6 +52,7 @@ export interface ReceiptForm {
   lotNumber: string;
   expiryDate: string;
   quantity: number | null;
+  concept?: string;
   unitPrice?: number | null;
   sourceCode?: number | null;
 }
@@ -50,6 +60,7 @@ export interface ReceiptForm {
 export interface ReceiptContext {
   today: ISODate;
   lots: readonly Lot[];
+  fundingSources: readonly FundingSource[];
   settings: Pick<Settings, 'criticalDays'>;
   /** Whether the chosen product exists in the catalog. */
   productExists: boolean;
@@ -58,7 +69,7 @@ export interface ReceiptContext {
 export function validateReceipt(form: ReceiptForm, context: ReceiptContext): ValidationResult {
   const errors: Record<string, string> = {};
   const warnings: Record<string, string> = {};
-  const { today, lots, settings } = context;
+  const { today, lots, fundingSources, settings } = context;
 
   if (!form.productId || !context.productExists) errors.productId = 'Selecciona un producto.';
 
@@ -66,7 +77,11 @@ export function validateReceipt(form: ReceiptForm, context: ReceiptContext): Val
   else if (form.date > today) errors.date = 'La fecha no puede ser futura.';
 
   const lotNumber = normalizeLotNumber(form.lotNumber);
-  if (!lotNumber) errors.lotNumber = 'Ingresa el número de lote.';
+  if (!lotNumber) {
+    errors.lotNumber = 'Ingresa el número de lote.';
+  } else if (lotNumber.length > LIMITS.shortText) {
+    errors.lotNumber = `El número de lote no puede superar ${LIMITS.shortText} caracteres.`;
+  }
 
   if (!form.expiryDate) {
     errors.expiryDate = 'Ingresa la fecha de vencimiento.';
@@ -78,7 +93,9 @@ export function validateReceipt(form: ReceiptForm, context: ReceiptContext): Val
     errors.expiryDate = 'El vencimiento debe ser posterior a la fecha de entrada.';
   } else {
     const existing =
-      form.productId && lotNumber ? findExistingLot(lots, form.productId, lotNumber) : undefined;
+      form.productId && !errors.lotNumber
+        ? findExistingLot(lots, form.productId, lotNumber)
+        : undefined;
     if (existing && existing.expiryDate !== form.expiryDate) {
       errors.expiryDate = `El lote ${lotNumber} ya existe con vencimiento distinto.`;
     } else {
@@ -92,17 +109,30 @@ export function validateReceipt(form: ReceiptForm, context: ReceiptContext): Val
 
   if (!isPositiveInteger(form.quantity)) {
     errors.quantity = 'La cantidad debe ser un número entero mayor que 0.';
+  } else if (form.quantity > LIMITS.maxNumber) {
+    errors.quantity = `La cantidad no puede superar ${MAX_NUMBER_TEXT}.`;
+  }
+
+  if (form.concept !== undefined && form.concept.trim().length > LIMITS.longText) {
+    errors.concept = `El concepto no puede superar ${LIMITS.longText} caracteres.`;
   }
 
   if (form.unitPrice !== null && form.unitPrice !== undefined) {
     if (!Number.isFinite(form.unitPrice) || form.unitPrice < 0) {
       errors.unitPrice = 'El precio no puede ser negativo.';
+    } else if (form.unitPrice > LIMITS.maxNumber) {
+      errors.unitPrice = `El precio no puede superar ${MAX_NUMBER_TEXT}.`;
     }
   }
 
   if (form.sourceCode !== null && form.sourceCode !== undefined) {
-    if (!Number.isInteger(form.sourceCode) || form.sourceCode < 1 || form.sourceCode > 16) {
-      errors.sourceCode = 'Elige una procedencia válida (1 a 16).';
+    if (
+      !Number.isInteger(form.sourceCode) ||
+      form.sourceCode < LIMITS.minSourceCode ||
+      form.sourceCode > LIMITS.maxSourceCode ||
+      !fundingSources.some((source) => source.code === form.sourceCode)
+    ) {
+      errors.sourceCode = 'Elige una procedencia válida.';
     }
   }
 
@@ -115,6 +145,7 @@ export interface IssueForm {
   productId: string;
   date: ISODate;
   quantity: number | null;
+  concept?: string;
   /** Set only when the user picked a lot by hand instead of taking the FEFO suggestion. */
   lotId?: string | null;
   fefoOverrideReason?: string;
@@ -145,11 +176,17 @@ export function validateIssue(form: IssueForm, context: IssueContext): Validatio
 
   if (!isPositiveInteger(form.quantity)) {
     errors.quantity = 'La cantidad debe ser un número entero mayor que 0.';
+  } else if (form.quantity > LIMITS.maxNumber) {
+    errors.quantity = `La cantidad no puede superar ${MAX_NUMBER_TEXT}.`;
   } else if (form.quantity > usableBalance) {
     errors.quantity =
       usableBalance === 1
         ? `Solo hay ${countNoun(usableBalance, unit)} disponible (no vencida).`
         : `Solo hay ${countNoun(usableBalance, unit)} disponibles (no vencidas).`;
+  }
+
+  if (form.concept !== undefined && form.concept.trim().length > LIMITS.longText) {
+    errors.concept = `El concepto no puede superar ${LIMITS.longText} caracteres.`;
   }
 
   if (form.lotId) {
@@ -159,7 +196,11 @@ export function validateIssue(form: IssueForm, context: IssueContext): Validatio
       errors.lotId = `El lote ${selectedLot.lotNumber} está vencido.`;
     } else if (selectedLot.balance <= 0) {
       errors.lotId = `El lote ${selectedLot.lotNumber} no tiene saldo.`;
-    } else if (isPositiveInteger(form.quantity) && form.quantity > selectedLot.balance) {
+    } else if (
+      isPositiveInteger(form.quantity) &&
+      form.quantity <= LIMITS.maxNumber &&
+      form.quantity > selectedLot.balance
+    ) {
       errors.quantity = `Solo hay ${countNoun(selectedLot.balance, unit)} en el lote ${selectedLot.lotNumber}.`;
     }
 
@@ -168,11 +209,276 @@ export function validateIssue(form: IssueForm, context: IssueContext): Validatio
       warnings.lotId = `Hay un lote que vence antes (${firstFefoLot.lotNumber}, ${
         days === 0 ? 'hoy' : dayCount(days)
       }).`;
-      if (!form.fefoOverrideReason?.trim()) {
+      const reason = form.fefoOverrideReason?.trim() ?? '';
+      if (!reason) {
         errors.fefoOverrideReason = 'Indica el motivo de usar otro lote.';
+      } else if (reason.length > LIMITS.longText) {
+        errors.fefoOverrideReason = `El motivo no puede superar ${LIMITS.longText} caracteres.`;
       }
     }
   }
 
   return { errors, warnings };
+}
+
+// --- Adjustment (ajuste) -----------------------------------------------------------------------
+
+export function validateAdjustment(
+  delta: number,
+  reason: string,
+  balance: number,
+): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (!Number.isInteger(delta) || delta === 0) {
+    errors.quantity = 'El ajuste debe ser un número entero distinto de 0.';
+  } else if (Math.abs(delta) > LIMITS.maxNumber) {
+    errors.quantity = `La cantidad no puede superar ${MAX_NUMBER_TEXT}.`;
+  } else if (balance + delta < 0) {
+    errors.quantity = 'El ajuste dejaría el saldo del lote en negativo.';
+  }
+
+  const trimmed = reason.trim();
+  if (!trimmed) {
+    errors.reason = 'Indica el motivo del ajuste.';
+  } else if (trimmed.length > MAX_ADJUSTMENT_REASON) {
+    errors.reason = `El motivo no puede superar ${MAX_ADJUSTMENT_REASON} caracteres.`;
+  }
+  return errors;
+}
+
+// --- Catalog & settings ------------------------------------------------------------------------
+
+export interface ProductForm {
+  id?: string;
+  name: string;
+  areaId: string;
+  unit: string;
+  code?: string | null;
+  cardNumber?: string | null;
+  packaging?: string | null;
+  unitsPerPackage?: number | null;
+  minStock?: number | null;
+  maxStock?: number | null;
+  avgMonthlyConsumption?: number | null;
+}
+
+export interface ProductContext {
+  areas: readonly Area[];
+  products: readonly Product[];
+  /** Id of the product being edited, if any (excluded from the duplicate-name check). */
+  existingId?: string;
+}
+
+export function validateProduct(
+  form: ProductForm,
+  context: ProductContext,
+): Record<string, string> {
+  const errors: Record<string, string> = {};
+
+  if (form.id !== undefined) {
+    const id = form.id.trim();
+    if (!id) errors.id = 'Falta el identificador del producto.';
+    else if (id.length > LIMITS.shortText) {
+      errors.id = `El identificador no puede superar ${LIMITS.shortText} caracteres.`;
+    }
+  }
+
+  const name = form.name.trim();
+  if (!name) {
+    errors.name = 'Ingresa el nombre del producto.';
+  } else if (name.length > LIMITS.longText) {
+    errors.name = `El nombre no puede superar ${LIMITS.longText} caracteres.`;
+  } else {
+    const key = normalizeText(name);
+    if (
+      context.products.some(
+        (p) =>
+          p.id !== context.existingId && p.areaId === form.areaId && normalizeText(p.name) === key,
+      )
+    ) {
+      errors.name = 'Ya existe un producto con ese nombre en esta área.';
+    }
+  }
+
+  if (
+    !form.areaId ||
+    form.areaId.length > LIMITS.shortText ||
+    !context.areas.some((a) => a.id === form.areaId)
+  ) {
+    errors.areaId = 'Elige un área.';
+  }
+
+  const unit = form.unit.trim();
+  if (!unit) {
+    errors.unit = 'Escribe la unidad base.';
+  } else if (unit.length > LIMITS.shortText) {
+    errors.unit = `La unidad base no puede superar ${LIMITS.shortText} caracteres.`;
+  }
+
+  if (form.code && form.code.trim().length > LIMITS.shortText) {
+    errors.code = `El código no puede superar ${LIMITS.shortText} caracteres.`;
+  }
+  if (form.cardNumber && form.cardNumber.trim().length > LIMITS.shortText) {
+    errors.cardNumber = `El número de tarjeta no puede superar ${LIMITS.shortText} caracteres.`;
+  }
+  if (form.packaging && form.packaging.trim().length > LIMITS.shortText) {
+    errors.packaging = `La presentación no puede superar ${LIMITS.shortText} caracteres.`;
+  }
+
+  if (form.unitsPerPackage !== undefined && form.unitsPerPackage !== null) {
+    if (!Number.isInteger(form.unitsPerPackage) || form.unitsPerPackage < 1) {
+      errors.unitsPerPackage = 'Debe ser al menos 1.';
+    } else if (form.unitsPerPackage > LIMITS.maxNumber) {
+      errors.unitsPerPackage = `No puede superar ${MAX_NUMBER_TEXT}.`;
+    }
+  }
+
+  if (form.minStock !== undefined && form.minStock !== null) {
+    if (!Number.isFinite(form.minStock) || form.minStock < 0) {
+      errors.minStock = 'No puede ser negativo.';
+    } else if (form.minStock > LIMITS.maxNumber) {
+      errors.minStock = `No puede superar ${MAX_NUMBER_TEXT}.`;
+    }
+  }
+
+  if (form.maxStock !== undefined && form.maxStock !== null) {
+    if (!Number.isFinite(form.maxStock) || form.maxStock < 0) {
+      errors.maxStock = 'No puede ser negativo.';
+    } else if (form.maxStock > LIMITS.maxNumber) {
+      errors.maxStock = `No puede superar ${MAX_NUMBER_TEXT}.`;
+    } else if (
+      form.minStock !== undefined &&
+      form.minStock !== null &&
+      !errors.minStock &&
+      form.maxStock < form.minStock
+    ) {
+      errors.maxStock = 'El máximo no puede ser menor que el mínimo.';
+    }
+  }
+
+  if (form.avgMonthlyConsumption !== undefined && form.avgMonthlyConsumption !== null) {
+    if (!Number.isFinite(form.avgMonthlyConsumption) || form.avgMonthlyConsumption < 0) {
+      errors.avgMonthlyConsumption = 'No puede ser negativo.';
+    } else if (form.avgMonthlyConsumption > LIMITS.maxNumber) {
+      errors.avgMonthlyConsumption = `No puede superar ${MAX_NUMBER_TEXT}.`;
+    }
+  }
+
+  return errors;
+}
+
+/** Why `name` cannot be an area name, or `undefined` if it can. `exceptId` is the area being renamed. */
+export function validateAreaName(
+  areas: readonly { id: string; name: string }[],
+  name: string,
+  exceptId?: string,
+): string | undefined {
+  const trimmed = name.trim();
+  if (!trimmed) return 'Escribe el nombre del área.';
+  if (trimmed.length > LIMITS.longText) {
+    return `El nombre no puede superar ${LIMITS.longText} caracteres.`;
+  }
+  const key = normalizeText(trimmed);
+  if (areas.some((a) => a.id !== exceptId && normalizeText(a.name) === key)) {
+    return 'Ya existe un área con ese nombre.';
+  }
+  return undefined;
+}
+
+/** Why `name` cannot be a funding source name, or `undefined` if it can. `exceptCode` is the source being renamed. */
+export function validateFundingSourceName(
+  sources: readonly { code: number; name: string }[],
+  name: string,
+  exceptCode?: number,
+): string | undefined {
+  const trimmed = name.trim();
+  if (!trimmed) return 'Escribe el nombre de la procedencia.';
+  if (trimmed.length > LIMITS.longText) {
+    return `El nombre no puede superar ${LIMITS.longText} caracteres.`;
+  }
+  const key = normalizeText(trimmed);
+  if (sources.some((s) => s.code !== exceptCode && normalizeText(s.name) === key)) {
+    return 'Ya existe una procedencia con ese nombre.';
+  }
+  return undefined;
+}
+
+/** Why `code` cannot be used for a new funding source, or `undefined` if it can. */
+export function validateFundingSourceCode(
+  sources: readonly { code: number }[],
+  code: number,
+): string | undefined {
+  if (!Number.isInteger(code) || code < LIMITS.minSourceCode || code > LIMITS.maxSourceCode) {
+    return `El código debe ser un número entero entre ${LIMITS.minSourceCode} y ${LIMITS.maxSourceCode}.`;
+  }
+  if (sources.some((s) => s.code === code)) {
+    return 'Ya existe una procedencia con ese código.';
+  }
+  return undefined;
+}
+
+export interface SettingsDraft {
+  labName: string;
+  criticalDays: number | null;
+  warningDays: number | null;
+  defaultMinMonths: number | null;
+  defaultMaxMonths: number | null;
+  todayOverride?: string;
+}
+
+const WHOLE_NUMBER = 'Ingresa un número entero de 1 o más.';
+
+const isPositiveInt = (value: number | null): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 1;
+
+export function validateSettings(d: SettingsDraft): Partial<Record<keyof SettingsDraft, string>> {
+  const errors: Partial<Record<keyof SettingsDraft, string>> = {};
+  const labName = d.labName.trim();
+  if (!labName) {
+    errors.labName = 'Escribe el nombre del laboratorio.';
+  } else if (labName.length > LIMITS.longText) {
+    errors.labName = `El nombre no puede superar ${LIMITS.longText} caracteres.`;
+  }
+
+  if (!isPositiveInt(d.criticalDays)) {
+    errors.criticalDays = WHOLE_NUMBER;
+  } else if (d.criticalDays > LIMITS.maxSettingDays) {
+    errors.criticalDays = `No puede superar ${LIMITS.maxSettingDays} días.`;
+  }
+
+  if (!isPositiveInt(d.warningDays)) {
+    errors.warningDays = WHOLE_NUMBER;
+  } else if (d.warningDays > LIMITS.maxSettingDays) {
+    errors.warningDays = `No puede superar ${LIMITS.maxSettingDays} días.`;
+  } else if (
+    !errors.criticalDays &&
+    isPositiveInt(d.criticalDays) &&
+    d.criticalDays >= d.warningDays
+  ) {
+    errors.warningDays = 'Los días de advertencia deben ser más que los días críticos.';
+  }
+
+  if (!isPositiveInt(d.defaultMinMonths)) {
+    errors.defaultMinMonths = WHOLE_NUMBER;
+  } else if (d.defaultMinMonths > LIMITS.maxSettingMonths) {
+    errors.defaultMinMonths = `No puede superar ${LIMITS.maxSettingMonths} meses.`;
+  }
+
+  if (!isPositiveInt(d.defaultMaxMonths)) {
+    errors.defaultMaxMonths = WHOLE_NUMBER;
+  } else if (d.defaultMaxMonths > LIMITS.maxSettingMonths) {
+    errors.defaultMaxMonths = `No puede superar ${LIMITS.maxSettingMonths} meses.`;
+  } else if (
+    !errors.defaultMinMonths &&
+    isPositiveInt(d.defaultMinMonths) &&
+    d.defaultMaxMonths < d.defaultMinMonths
+  ) {
+    errors.defaultMaxMonths = 'El máximo no puede ser menor que el mínimo.';
+  }
+
+  if (d.todayOverride !== undefined && d.todayOverride !== '' && !isValidISODate(d.todayOverride)) {
+    errors.todayOverride = 'Ingresa una fecha válida.';
+  }
+
+  return errors;
 }

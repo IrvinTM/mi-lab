@@ -202,4 +202,35 @@ describe('ReceivePage', () => {
     expect(screen.getByTestId('where')).toHaveTextContent('/inicio');
     expect(receipts()).toHaveLength(before);
   });
+
+  it('enforces LIMITS caps in the form and accepts a custom funding source past code 16', async () => {
+    const user = userEvent.setup();
+    act(() => {
+      useInventoryStore.getState().addFundingSource('Donación externa', 25);
+    });
+    renderPage();
+    expect(screen.getByLabelText('N.º de lote')).toHaveAttribute('maxlength', '120');
+    expect(screen.getByLabelText('Concepto')).toHaveAttribute('maxlength', '1000');
+
+    // Quantity field ignores digits past LIMITS.maxNumber (1,000,000,000).
+    await user.type(screen.getByLabelText('Cantidad'), '10000000009');
+    expect(screen.getByLabelText('Cantidad')).toHaveValue('1000000000');
+
+    // Price past LIMITS.maxNumber is rejected with a Spanish error.
+    await user.type(screen.getByLabelText('N.º de lote'), 'LT555008');
+    setDate('Vencimiento', '2027-09-01');
+    await user.type(screen.getByLabelText(/Precio unitario/), '1000000001');
+    await user.selectOptions(screen.getByLabelText('Procedencia'), '25');
+    await user.click(screen.getByRole('button', { name: 'Registrar entrada' }));
+    expect(screen.getByText('El precio no puede superar 1,000,000,000.')).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText(/Precio unitario/));
+    await user.type(screen.getByLabelText(/Precio unitario/), '1000000000');
+    await user.click(screen.getByRole('button', { name: 'Registrar entrada' }));
+    expect(receipts().at(-1)).toMatchObject({
+      quantity: 1_000_000_000,
+      unitPrice: 1_000_000_000,
+      sourceCode: 25,
+    });
+  });
 });

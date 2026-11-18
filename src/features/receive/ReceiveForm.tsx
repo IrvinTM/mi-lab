@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { daysUntil } from '@/domain/dates';
+import { LIMITS } from '@/domain/limits';
 import { productStock } from '@/domain/stock';
 import { findExistingLot, validateReceipt } from '@/domain/validation';
 import { formatDate, formatQuantity } from '@/lib/format';
@@ -53,10 +54,17 @@ export function ReceiveForm({ initialProductId = '', onDone, onCancel }: Receive
       lotNumber,
       expiryDate,
       quantity: baseQuantity,
+      concept,
       unitPrice: Number.isNaN(unitPrice) ? null : unitPrice,
       sourceCode: sourceCode === '' ? null : Number(sourceCode),
     },
-    { today, lots: data.lots, settings: data.settings, productExists: product !== undefined },
+    {
+      today,
+      lots: data.lots,
+      fundingSources: data.fundingSources,
+      settings: data.settings,
+      productExists: product !== undefined,
+    },
   );
   const errors: Record<string, string> = { ...check.errors };
   if (Number.isNaN(unitPrice)) errors.unitPrice = 'Ingresa un precio válido, por ejemplo 2.50.';
@@ -136,11 +144,18 @@ export function ReceiveForm({ initialProductId = '', onDone, onCancel }: Receive
           max={today}
           error={shown('date')}
         />
-        <TextField label="Concepto" value={concept} onChange={setConcept} />
+        <TextField
+          label="Concepto"
+          value={concept}
+          onChange={setConcept}
+          maxLength={LIMITS.longText}
+          error={shown('concept')}
+        />
         <TextField
           label="N.º de lote"
           value={lotNumber}
           onChange={setLotNumber}
+          maxLength={LIMITS.shortText}
           autoCapitalize="characters"
           autoComplete="off"
           error={shown('lotNumber')}
@@ -170,6 +185,7 @@ export function ReceiveForm({ initialProductId = '', onDone, onCancel }: Receive
           label={`Precio unitario (USD por ${product?.unit ?? 'unidad'})`}
           value={price}
           onChange={setPrice}
+          maxLength={LIMITS.shortText}
           inputMode="decimal"
           placeholder="0.00"
           error={shown('unitPrice')}
@@ -181,6 +197,9 @@ export function ReceiveForm({ initialProductId = '', onDone, onCancel }: Receive
           label="Cantidad"
           value={quantity}
           onChange={setQuantity}
+          max={
+            usesPackages ? Math.max(1, Math.floor(LIMITS.maxNumber / perPackage)) : LIMITS.maxNumber
+          }
           error={shown('quantity')}
           help={
             usesPackages && baseQuantity !== null && product

@@ -1,9 +1,17 @@
 import {
   findExistingLot,
   isValid,
+  LIMITS,
+  MAX_ADJUSTMENT_REASON,
   normalizeLotNumber,
+  validateAdjustment,
+  validateAreaName,
+  validateFundingSourceCode,
+  validateFundingSourceName,
   validateIssue,
+  validateProduct,
   validateReceipt,
+  validateSettings,
   type IssueContext,
   type IssueForm,
   type ReceiptContext,
@@ -24,6 +32,11 @@ const existingLot: Lot = {
 const receiptContext: ReceiptContext = {
   today: TODAY,
   lots: [existingLot],
+  fundingSources: [
+    { code: 1, name: 'GOES' },
+    { code: 16, name: 'Otros' },
+    { code: LIMITS.maxSourceCode, name: 'Tope' },
+  ],
   settings: { criticalDays: 30 },
   productExists: true,
 };
@@ -67,10 +80,18 @@ describe('validateReceipt', () => {
     ).toBeTruthy();
   });
 
-  it('requires a lot number (blank counts as missing)', () => {
+  it('requires a lot number (blank counts as missing) and enforces LIMITS.shortText', () => {
     expect(validateReceipt(receipt({ lotNumber: '   ' }), receiptContext).errors.lotNumber).toBe(
       'Ingresa el número de lote.',
     );
+    expect(
+      validateReceipt(receipt({ lotNumber: `  ${'a'.repeat(LIMITS.shortText)}  ` }), receiptContext)
+        .errors.lotNumber,
+    ).toBeUndefined();
+    expect(
+      validateReceipt(receipt({ lotNumber: 'a'.repeat(LIMITS.shortText + 1) }), receiptContext)
+        .errors.lotNumber,
+    ).toBe(`El número de lote no puede superar ${LIMITS.shortText} caracteres.`);
   });
 
   describe('expiry date', () => {
@@ -144,15 +165,33 @@ describe('validateReceipt', () => {
       expect(validateReceipt(receipt({ quantity }), receiptContext).errors.quantity).toBeTruthy();
     });
 
-    it('accepts a positive integer', () => {
+    it('accepts positive integers up to LIMITS.maxNumber and rejects past it', () => {
       expect(
         validateReceipt(receipt({ quantity: 1 }), receiptContext).errors.quantity,
       ).toBeUndefined();
+      expect(
+        validateReceipt(receipt({ quantity: LIMITS.maxNumber }), receiptContext).errors.quantity,
+      ).toBeUndefined();
+      expect(
+        validateReceipt(receipt({ quantity: LIMITS.maxNumber + 1 }), receiptContext).errors
+          .quantity,
+      ).toBe('La cantidad no puede superar 1,000,000,000.');
     });
   });
 
   describe('optional fields', () => {
-    it('price: empty or ≥ 0 is fine, negative is not', () => {
+    it('concept: up to LIMITS.longText is fine, past it is rejected', () => {
+      expect(
+        validateReceipt(receipt({ concept: 'x'.repeat(LIMITS.longText) }), receiptContext).errors
+          .concept,
+      ).toBeUndefined();
+      expect(
+        validateReceipt(receipt({ concept: 'x'.repeat(LIMITS.longText + 1) }), receiptContext)
+          .errors.concept,
+      ).toBe(`El concepto no puede superar ${LIMITS.longText} caracteres.`);
+    });
+
+    it('price: empty or 0..LIMITS.maxNumber is fine, negative or past maxNumber is not', () => {
       expect(
         validateReceipt(receipt({ unitPrice: null }), receiptContext).errors.unitPrice,
       ).toBeUndefined();
@@ -163,29 +202,55 @@ describe('validateReceipt', () => {
         validateReceipt(receipt({ unitPrice: 2.35 }), receiptContext).errors.unitPrice,
       ).toBeUndefined();
       expect(
+        validateReceipt(receipt({ unitPrice: LIMITS.maxNumber }), receiptContext).errors.unitPrice,
+      ).toBeUndefined();
+      expect(
         validateReceipt(receipt({ unitPrice: -1 }), receiptContext).errors.unitPrice,
       ).toBeTruthy();
+      expect(
+        validateReceipt(receipt({ unitPrice: LIMITS.maxNumber + 1 }), receiptContext).errors
+          .unitPrice,
+      ).toBe('El precio no puede superar 1,000,000,000.');
     });
 
-    it('source: empty or 1–16 is fine, anything else is not', () => {
+    it('source: empty or an existing code in 0..999_999 is fine; unknown or out-of-range codes are rejected', () => {
       expect(
         validateReceipt(receipt({ sourceCode: null }), receiptContext).errors.sourceCode,
       ).toBeUndefined();
       expect(
-        validateReceipt(receipt({ sourceCode: 1 }), receiptContext).errors.sourceCode,
+        validateReceipt(receipt({ sourceCode: 1 }), receiptContext).errors
+          .sourceCode,
       ).toBeUndefined();
       expect(
         validateReceipt(receipt({ sourceCode: 16 }), receiptContext).errors.sourceCode,
       ).toBeUndefined();
       expect(
-        validateReceipt(receipt({ sourceCode: 0 }), receiptContext).errors.sourceCode,
-      ).toBeTruthy();
+        validateReceipt(receipt({ sourceCode: LIMITS.maxSourceCode }), receiptContext).errors
+          .sourceCode,
+      ).toBeUndefined();
+      // Valid number in range, but absent from context.fundingSources:
+      expect(validateReceipt(receipt({ sourceCode: 17 }), receiptContext).errors.sourceCode).toBe(
+        'Elige una procedencia válida.',
+      );
+      // Out of range, even if a corrupt entry were in context.fundingSources:
+      const withOutOfRange = {
+        ...receiptContext,
+        fundingSources: [
+          ...receiptContext.fundingSources,
+          { code: -1, name: 'Negativa' },
+          { code: LIMITS.maxSourceCode + 1, name: 'Exceso' },
+        ],
+      };
+      expect(validateReceipt(receipt({ sourceCode: -1 }), withOutOfRange).errors.sourceCode).toBe(
+        'Elige una procedencia válida.',
+      );
       expect(
-        validateReceipt(receipt({ sourceCode: 17 }), receiptContext).errors.sourceCode,
-      ).toBeTruthy();
-      expect(
-        validateReceipt(receipt({ sourceCode: 2.5 }), receiptContext).errors.sourceCode,
-      ).toBeTruthy();
+        validateReceipt(receipt({ sourceCode: LIMITS.maxSourceCode + 1 }), withOutOfRange).errors
+          .sourceCode,
+      ).toBe('Elige una procedencia válida.');
+      expect(validateReceipt(receipt({ sourceCode: 2.5 }), receiptContext).errors.sourceCode).toBe(
+        'Elige una procedencia válida.',
+      );
     });
   });
 
@@ -334,5 +399,143 @@ describe('validateIssue', () => {
       });
       expect(result.warnings.lotId).toBe('Hay un lote que vence antes (LT004512, hoy).');
     });
+
+    it('enforces LIMITS.longText on fefoOverrideReason', () => {
+      expect(
+        validateIssue(issue({ lotId: 'far', fefoOverrideReason: 'x'.repeat(LIMITS.longText) }), {
+          ...issueContext,
+          selectedLot: far,
+        }).errors.fefoOverrideReason,
+      ).toBeUndefined();
+      expect(
+        validateIssue(
+          issue({ lotId: 'far', fefoOverrideReason: 'x'.repeat(LIMITS.longText + 1) }),
+          { ...issueContext, selectedLot: far },
+        ).errors.fefoOverrideReason,
+      ).toBe(`El motivo no puede superar ${LIMITS.longText} caracteres.`);
+    });
+  });
+
+  it('enforces LIMITS.maxNumber on quantity and LIMITS.longText on concept', () => {
+    const hugeStock = { ...issueContext, usableBalance: LIMITS.maxNumber * 2 };
+    expect(validateIssue(issue({ quantity: LIMITS.maxNumber }), hugeStock).errors.quantity).toBe(
+      undefined,
+    );
+    expect(
+      validateIssue(issue({ quantity: LIMITS.maxNumber + 1 }), hugeStock).errors.quantity,
+    ).toBe('La cantidad no puede superar 1,000,000,000.');
+    expect(
+      validateIssue(issue({ concept: 'x'.repeat(LIMITS.longText) }), issueContext).errors.concept,
+    ).toBeUndefined();
+    expect(
+      validateIssue(issue({ concept: 'x'.repeat(LIMITS.longText + 1) }), issueContext).errors
+        .concept,
+    ).toBe(`El concepto no puede superar ${LIMITS.longText} caracteres.`);
+  });
+});
+
+describe('validateAdjustment, validateProduct, catalog and settings limits', () => {
+  it('enforces LIMITS.maxNumber and MAX_ADJUSTMENT_REASON on adjustments', () => {
+    expect(validateAdjustment(LIMITS.maxNumber, 'x'.repeat(MAX_ADJUSTMENT_REASON), 0)).toEqual({});
+    expect(validateAdjustment(-LIMITS.maxNumber, 'Conteo', LIMITS.maxNumber)).toEqual({});
+    expect(validateAdjustment(LIMITS.maxNumber + 1, 'Conteo', 0).quantity).toBe(
+      'La cantidad no puede superar 1,000,000,000.',
+    );
+    expect(
+      validateAdjustment(-(LIMITS.maxNumber + 1), 'Conteo', LIMITS.maxNumber * 2).quantity,
+    ).toBe('La cantidad no puede superar 1,000,000,000.');
+    expect(validateAdjustment(1, 'x'.repeat(MAX_ADJUSTMENT_REASON + 1), 0).reason).toBe(
+      `El motivo no puede superar ${MAX_ADJUSTMENT_REASON} caracteres.`,
+    );
+  });
+
+  it('enforces shortText, longText and maxNumber on every product field', () => {
+    const ctx = { areas: [{ id: 'a1', name: 'Química' }], products: [] };
+    expect(
+      validateProduct(
+        {
+          id: 'i'.repeat(LIMITS.shortText),
+          name: 'n'.repeat(LIMITS.longText),
+          areaId: 'a1',
+          unit: 'u'.repeat(LIMITS.shortText),
+          code: 'c'.repeat(LIMITS.shortText),
+          cardNumber: 'k'.repeat(LIMITS.shortText),
+          packaging: 'p'.repeat(LIMITS.shortText),
+          unitsPerPackage: LIMITS.maxNumber,
+          minStock: LIMITS.maxNumber,
+          maxStock: LIMITS.maxNumber,
+          avgMonthlyConsumption: LIMITS.maxNumber,
+        },
+        ctx,
+      ),
+    ).toEqual({});
+
+    const over = validateProduct(
+      {
+        id: 'i'.repeat(LIMITS.shortText + 1),
+        name: 'n'.repeat(LIMITS.longText + 1),
+        areaId: 'a1',
+        unit: 'u'.repeat(LIMITS.shortText + 1),
+        code: 'c'.repeat(LIMITS.shortText + 1),
+        cardNumber: 'k'.repeat(LIMITS.shortText + 1),
+        packaging: 'p'.repeat(LIMITS.shortText + 1),
+        unitsPerPackage: LIMITS.maxNumber + 1,
+        minStock: LIMITS.maxNumber + 1,
+        maxStock: LIMITS.maxNumber + 1,
+        avgMonthlyConsumption: LIMITS.maxNumber + 1,
+      },
+      ctx,
+    );
+    expect(Object.keys(over).sort()).toEqual([
+      'avgMonthlyConsumption',
+      'cardNumber',
+      'code',
+      'id',
+      'maxStock',
+      'minStock',
+      'name',
+      'packaging',
+      'unit',
+      'unitsPerPackage',
+    ]);
+  });
+
+  it('enforces longText and sourceCode bounds on areas, funding sources and settings', () => {
+    expect(validateAreaName([], 'a'.repeat(LIMITS.longText))).toBeUndefined();
+    expect(validateAreaName([], 'a'.repeat(LIMITS.longText + 1))).toMatch(/1000 caracteres/);
+
+    expect(validateFundingSourceName([], 's'.repeat(LIMITS.longText))).toBeUndefined();
+    expect(validateFundingSourceName([], 's'.repeat(LIMITS.longText + 1))).toMatch(
+      /1000 caracteres/,
+    );
+
+    expect(validateFundingSourceCode([], LIMITS.minSourceCode)).toBeUndefined();
+    expect(validateFundingSourceCode([], LIMITS.maxSourceCode)).toBeUndefined();
+    expect(validateFundingSourceCode([], LIMITS.minSourceCode - 1)).toMatch(/entre 0 y 999999/);
+    expect(validateFundingSourceCode([], LIMITS.maxSourceCode + 1)).toMatch(/entre 0 y 999999/);
+
+    expect(
+      validateSettings({
+        labName: 'l'.repeat(LIMITS.longText),
+        criticalDays: LIMITS.maxSettingDays - 1,
+        warningDays: LIMITS.maxSettingDays,
+        defaultMinMonths: LIMITS.maxSettingMonths,
+        defaultMaxMonths: LIMITS.maxSettingMonths,
+      }),
+    ).toEqual({});
+    const badSettings = validateSettings({
+      labName: 'l'.repeat(LIMITS.longText + 1),
+      criticalDays: LIMITS.maxSettingDays + 1,
+      warningDays: LIMITS.maxSettingDays + 1,
+      defaultMinMonths: LIMITS.maxSettingMonths + 1,
+      defaultMaxMonths: LIMITS.maxSettingMonths + 1,
+    });
+    expect(Object.keys(badSettings).sort()).toEqual([
+      'criticalDays',
+      'defaultMaxMonths',
+      'defaultMinMonths',
+      'labName',
+      'warningDays',
+    ]);
   });
 });

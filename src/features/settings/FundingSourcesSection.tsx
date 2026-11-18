@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
+import { LIMITS } from '@/domain/limits';
 import type { FundingSource } from '@/domain/types';
 import { countNoun } from '@/domain/plural';
 import { useInventoryStore } from '@/state/store';
@@ -27,6 +28,7 @@ function RenameForm({ source, onClose }: { source: FundingSource; onClose: () =>
       <TextField
         label="Nombre de la procedencia"
         value={name}
+        maxLength={LIMITS.longText}
         onChange={(value) => {
           setName(value);
           setError(undefined);
@@ -139,6 +141,7 @@ export function FundingSourcesSection() {
           className="flex-1"
           label="Nueva procedencia"
           value={newName}
+          maxLength={LIMITS.longText}
           onChange={(value) => {
             setNewName(value);
             setErrors({});
@@ -150,6 +153,7 @@ export function FundingSourcesSection() {
           className="sheet:w-40"
           label="Código (opcional)"
           value={newCode}
+          max={LIMITS.maxSourceCode}
           onChange={(value) => {
             setNewCode(value);
             setErrors({});

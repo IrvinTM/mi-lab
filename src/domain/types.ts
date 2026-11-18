@@ -6,7 +6,7 @@ export interface Area {
   name: string;
 }
 
-/** Funding source, codes 1..16 (see seed). */
+/** Funding source, codes 0..999_999 (1..16 in the MINSAL seed). */
 export interface FundingSource {
   code: number;
   name: string;

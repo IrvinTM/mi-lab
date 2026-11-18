@@ -1,7 +1,10 @@
+import { migrate } from '@/data/migrate';
 import { RepositoryError, type InventoryRepository } from '@/data/repository';
 import { MemoryRepository } from '@/data/memoryRepository';
+import { LIMITS } from '@/domain/limits';
 import { lotBalance, productStock } from '@/domain/stock';
 import type { InventoryData } from '@/domain/types';
+import { MAX_ADJUSTMENT_REASON } from '@/domain/validation';
 import { sampleData } from '@/test/fixtures';
 import { currentToday } from './today';
 import { createInventoryStore, type ActionFailure, type ReceiveInput } from './store';
@@ -13,6 +16,7 @@ const NOW = new Date(2026, 10, 13, 12, 0, 0);
 function twoProducts(): InventoryData {
   const data = sampleData();
   data.settings.todayOverride = TODAY;
+  data.fundingSources.push({ code: 3, name: 'O.P.S' });
   data.products.push({ id: 'p2', name: 'Colesterol', areaId: 'a1', unit: 'prueba' });
   const move = (id: string, lotId: string, quantity: number, productId = 'p1') => ({
     id,
@@ -272,6 +276,20 @@ describe('receive', () => {
     expect(
       failureOf(store.getState().receive(receipt({ productId: 'nope' }))).errors.productId,
     ).toBeTruthy();
+    expect(failureOf(store.getState().receive(receipt({ sourceCode: 99 }))).errors.sourceCode).toBe(
+      'Elige una procedencia válida.',
+    );
+  });
+
+  it('accepts a custom funding source with code > 16 once registered', async () => {
+    const { store } = await readyStore();
+    expect(store.getState().addFundingSource('Donación especial', 17)).toEqual({
+      ok: true,
+      code: 17,
+    });
+    const result = store.getState().receive(receipt({ sourceCode: 17 }));
+    expect(result.ok).toBe(true);
+    expect(store.getState().data.lots.at(-1)?.sourceCode).toBe(17);
   });
 
   it('uses a custom concept', async () => {
@@ -649,9 +667,24 @@ describe('funding sources', () => {
     expect(failed(store.getState().addFundingSource('X', existing.code)).errors.code).toMatch(
       /Ya existe/,
     );
+    expect(failed(store.getState().addFundingSource('X', -1)).errors.code).toMatch(
+      /entre 0 y 999999/,
+    );
     expect(failed(store.getState().addFundingSource('X', -1)).errors.code).toMatch(/entero/);
     expect(failed(store.getState().addFundingSource('X', 1.5)).errors.code).toMatch(/entero/);
+    expect(
+      failed(store.getState().addFundingSource('X', LIMITS.maxSourceCode + 1)).errors.code,
+    ).toMatch(/entre 0 y 999999/);
     expect(store.getState().data).toBe(before);
+
+    // Auto-increment past maxSourceCode is also rejected instead of creating 1,000,000.
+    expect(store.getState().addFundingSource('Tope', LIMITS.maxSourceCode)).toEqual({
+      ok: true,
+      code: LIMITS.maxSourceCode,
+    });
+    expect(failed(store.getState().addFundingSource('Pasada')).errors.code).toMatch(
+      /entre 0 y 999999/,
+    );
   });
 
   it('renames, and only removes sources nothing refers to', async () => {
@@ -674,5 +707,317 @@ describe('funding sources', () => {
     expect(failed(store.getState().removeFundingSource(used.code)).errors.code).toMatch(
       /No se puede eliminar/,
     );
+  });
+});
+
+describe('LIMITS round trip (store → JSON → migrate)', () => {
+  const roundTrip = (data: InventoryData): InventoryData =>
+    migrate(JSON.parse(JSON.stringify(data)));
+
+  it('survives migrate() unchanged when every field is saved right at its LIMITS boundary', async () => {
+    const { store, repository } = await readyStore(null);
+    store.getState().resetToEmpty();
+
+    const short = (char: string) => char.repeat(LIMITS.shortText);
+    const long = (char: string) => char.repeat(LIMITS.longText);
+
+    const areaRes = store.getState().addArea(long('A'));
+    expect(areaRes.ok).toBe(true);
+    const areaId = (areaRes as { ok: true; areaId: string }).areaId;
+    expect(store.getState().renameArea(areaId, long('B'))).toEqual({ ok: true });
+
+    expect(store.getState().addFundingSource(long('F'), LIMITS.minSourceCode)).toEqual({
+      ok: true,
+      code: LIMITS.minSourceCode,
+    });
+    expect(store.getState().addFundingSource('Máxima', LIMITS.maxSourceCode)).toEqual({
+      ok: true,
+      code: LIMITS.maxSourceCode,
+    });
+    expect(store.getState().renameFundingSource(LIMITS.maxSourceCode, long('M'))).toEqual({
+      ok: true,
+    });
+
+    const prodRes = store.getState().addProduct({
+      name: long('P'),
+      areaId,
+      unit: short('u'),
+      code: short('c'),
+      cardNumber: short('k'),
+      packaging: short('e'),
+      unitsPerPackage: LIMITS.maxNumber,
+      minStock: LIMITS.maxNumber,
+      maxStock: LIMITS.maxNumber,
+      avgMonthlyConsumption: LIMITS.maxNumber,
+    });
+    expect(prodRes.ok).toBe(true);
+    const productId = (prodRes as { ok: true; productId: string }).productId;
+
+    expect(
+      store.getState().upsertProduct({
+        id: short('i'),
+        name: long('Q'),
+        areaId,
+        unit: short('v'),
+        code: short('d'),
+        cardNumber: short('t'),
+        packaging: short('f'),
+        unitsPerPackage: LIMITS.maxNumber,
+        minStock: 0,
+        maxStock: LIMITS.maxNumber,
+        avgMonthlyConsumption: LIMITS.maxNumber,
+      }),
+    ).toEqual({ ok: true });
+
+    // Receive two lots at LIMITS.maxNumber so we can also test manual FEFO override and adjustments.
+    const firstLot = store.getState().receive({
+      productId,
+      date: TODAY,
+      lotNumber: short('L'),
+      expiryDate: '2027-03-01',
+      quantity: LIMITS.maxNumber,
+      concept: long('C'),
+      unitPrice: LIMITS.maxNumber,
+      sourceCode: LIMITS.minSourceCode,
+    });
+    expect(firstLot.ok).toBe(true);
+
+    const secondLot = store.getState().receive({
+      productId,
+      date: TODAY,
+      lotNumber: short('N'),
+      expiryDate: '2027-09-01',
+      quantity: LIMITS.maxNumber,
+      concept: long('D'),
+      unitPrice: LIMITS.maxNumber,
+      sourceCode: LIMITS.maxSourceCode,
+    });
+    expect(secondLot.ok).toBe(true);
+    const secondLotId = (secondLot as { ok: true; lotId: string }).lotId;
+
+    // Issue at LIMITS.maxNumber (takes firstLot) and manual override on secondLot with long reason.
+    expect(
+      store.getState().issue({
+        productId,
+        date: TODAY,
+        quantity: LIMITS.maxNumber,
+        concept: long('S'),
+      }),
+    ).toMatchObject({ ok: true });
+
+    // Re-add stock to firstLot so secondLot is a manual FEFO override.
+    expect(
+      store.getState().receive({
+        productId,
+        date: TODAY,
+        lotNumber: short('L'),
+        expiryDate: '2027-03-01',
+        quantity: 10,
+      }),
+    ).toMatchObject({ ok: true });
+
+    expect(
+      store.getState().issue({
+        productId,
+        date: TODAY,
+        quantity: 1,
+        concept: long('O'),
+        lotId: secondLotId,
+        fefoOverrideReason: long('R'),
+      }),
+    ).toMatchObject({ ok: true });
+
+    // Signed adjustments at ±LIMITS.maxNumber and MAX_ADJUSTMENT_REASON (concept == 1000 chars).
+    expect(
+      store.getState().adjust(secondLotId, LIMITS.maxNumber, 'J'.repeat(MAX_ADJUSTMENT_REASON)),
+    ).toMatchObject({ ok: true });
+    expect(store.getState().data.movements.at(-1)!.concept).toHaveLength(LIMITS.longText);
+    expect(store.getState().adjust(secondLotId, -LIMITS.maxNumber, 'Conteo')).toMatchObject({
+      ok: true,
+    });
+
+    expect(
+      store.getState().updateSettings({
+        labName: long('H'),
+        criticalDays: LIMITS.maxSettingDays - 1,
+        warningDays: LIMITS.maxSettingDays,
+        defaultMinMonths: LIMITS.maxSettingMonths,
+        defaultMaxMonths: LIMITS.maxSettingMonths,
+      }),
+    ).toEqual({ ok: true });
+
+    await store.getState().flush();
+    const saved = store.getState().data;
+    const reloaded = roundTrip(saved);
+    expect(reloaded).toEqual(saved);
+    expect(await repository.load()).toEqual(saved);
+    // Optional short texts on products are preserved, never silently dropped:
+    const product = reloaded.products.find((p) => p.id === productId)!;
+    expect(product.code).toHaveLength(LIMITS.shortText);
+    expect(product.cardNumber).toHaveLength(LIMITS.shortText);
+    expect(product.packaging).toHaveLength(LIMITS.shortText);
+  });
+
+  it('rejects values just past each LIMITS boundary without mutating the store', async () => {
+    const { store } = await readyStore();
+    // Give l1 enough stock so quantity > usableBalance does not mask LIMITS.maxNumber + 1.
+    expect(
+      store
+        .getState()
+        .receive(
+          receipt({ lotNumber: 'LT123456', expiryDate: '2027-06-30', quantity: LIMITS.maxNumber }),
+        ),
+    ).toMatchObject({ ok: true });
+    expect(
+      store
+        .getState()
+        .receive(
+          receipt({ lotNumber: 'LT999999', expiryDate: '2027-09-01', quantity: LIMITS.maxNumber }),
+        ),
+    ).toMatchObject({ ok: true });
+
+    const before = store.getState().data;
+    const overShort = 'x'.repeat(LIMITS.shortText + 1);
+    const overLong = 'x'.repeat(LIMITS.longText + 1);
+    const overNum = LIMITS.maxNumber + 1;
+    const farLotId = before.lots.find((l) => l.lotNumber === 'LT999999')!.id;
+
+    expect(failureOf(store.getState().addArea(overLong)).errors.name).toBeTruthy();
+    expect(failureOf(store.getState().renameArea('a1', overLong)).errors.name).toBeTruthy();
+    expect(failureOf(store.getState().addFundingSource(overLong)).errors.name).toBeTruthy();
+    expect(failureOf(store.getState().addFundingSource('Negativa', -1)).errors.code).toBeTruthy();
+    expect(
+      failureOf(store.getState().addFundingSource('Exceso', LIMITS.maxSourceCode + 1)).errors.code,
+    ).toBeTruthy();
+    expect(failureOf(store.getState().renameFundingSource(1, overLong)).errors.name).toBeTruthy();
+
+    expect(
+      failureOf(store.getState().addProduct({ name: overLong, areaId: 'a1', unit: 'prueba' }))
+        .errors.name,
+    ).toBeTruthy();
+    expect(
+      failureOf(store.getState().addProduct({ name: 'Nuevo', areaId: 'a1', unit: overShort }))
+        .errors.unit,
+    ).toBeTruthy();
+    expect(
+      failureOf(
+        store
+          .getState()
+          .addProduct({ name: 'Nuevo', areaId: 'a1', unit: 'prueba', code: overShort }),
+      ).errors.code,
+    ).toBeTruthy();
+    expect(
+      failureOf(
+        store.getState().addProduct({
+          name: 'Nuevo',
+          areaId: 'a1',
+          unit: 'prueba',
+          cardNumber: overShort,
+        }),
+      ).errors.cardNumber,
+    ).toBeTruthy();
+    expect(
+      failureOf(
+        store.getState().addProduct({
+          name: 'Nuevo',
+          areaId: 'a1',
+          unit: 'prueba',
+          packaging: overShort,
+        }),
+      ).errors.packaging,
+    ).toBeTruthy();
+    expect(
+      failureOf(
+        store.getState().addProduct({
+          name: 'Nuevo',
+          areaId: 'a1',
+          unit: 'prueba',
+          unitsPerPackage: overNum,
+        }),
+      ).errors.unitsPerPackage,
+    ).toBeTruthy();
+    expect(
+      failureOf(
+        store.getState().upsertProduct({
+          ...before.products[0]!,
+          code: overShort,
+          minStock: overNum,
+          maxStock: overNum,
+          avgMonthlyConsumption: overNum,
+        }),
+      ).errors,
+    ).toMatchObject({
+      code: expect.any(String),
+      minStock: expect.any(String),
+      maxStock: expect.any(String),
+      avgMonthlyConsumption: expect.any(String),
+    });
+
+    expect(
+      failureOf(store.getState().receive(receipt({ lotNumber: overShort }))).errors.lotNumber,
+    ).toBeTruthy();
+    expect(
+      failureOf(store.getState().receive(receipt({ concept: overLong }))).errors.concept,
+    ).toBeTruthy();
+    expect(
+      failureOf(store.getState().receive(receipt({ quantity: overNum }))).errors.quantity,
+    ).toBeTruthy();
+    expect(
+      failureOf(store.getState().receive(receipt({ unitPrice: overNum }))).errors.unitPrice,
+    ).toBeTruthy();
+    expect(
+      failureOf(store.getState().receive(receipt({ sourceCode: -1 }))).errors.sourceCode,
+    ).toBeTruthy();
+    expect(
+      failureOf(store.getState().receive(receipt({ sourceCode: LIMITS.maxSourceCode + 1 }))).errors
+        .sourceCode,
+    ).toBeTruthy();
+
+    expect(
+      failureOf(store.getState().issue({ productId: 'p1', date: TODAY, quantity: overNum })).errors
+        .quantity,
+    ).toBeTruthy();
+    expect(
+      failureOf(
+        store.getState().issue({ productId: 'p1', date: TODAY, quantity: 1, concept: overLong }),
+      ).errors.concept,
+    ).toBeTruthy();
+    expect(
+      failureOf(
+        store.getState().issue({
+          productId: 'p1',
+          date: TODAY,
+          quantity: 1,
+          lotId: farLotId,
+          fefoOverrideReason: overLong,
+        }),
+      ).errors.fefoOverrideReason,
+    ).toBeTruthy();
+
+    expect(
+      failureOf(store.getState().adjust(farLotId, overNum, 'Conteo')).errors.quantity,
+    ).toBeTruthy();
+    expect(
+      failureOf(store.getState().adjust(farLotId, -overNum, 'Conteo')).errors.quantity,
+    ).toBeTruthy();
+    expect(
+      failureOf(store.getState().adjust(farLotId, 1, 'x'.repeat(MAX_ADJUSTMENT_REASON + 1))).errors
+        .reason,
+    ).toBeTruthy();
+
+    expect(
+      failureOf(store.getState().updateSettings({ labName: overLong })).errors.labName,
+    ).toBeTruthy();
+    expect(
+      failureOf(store.getState().updateSettings({ warningDays: LIMITS.maxSettingDays + 1 })).errors
+        .warningDays,
+    ).toBeTruthy();
+    expect(
+      failureOf(store.getState().updateSettings({ defaultMaxMonths: LIMITS.maxSettingMonths + 1 }))
+        .errors.defaultMaxMonths,
+    ).toBeTruthy();
+
+    expect(store.getState().data).toBe(before);
+    expect(roundTrip(store.getState().data)).toEqual(store.getState().data);
   });
 });

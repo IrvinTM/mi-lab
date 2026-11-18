@@ -1,19 +1,13 @@
 import { useState, type FormEvent } from 'react';
+import { LIMITS } from '@/domain/limits';
 import type { Settings } from '@/domain/types';
+import { validateSettings, type SettingsDraft } from '@/domain/validation';
 import { useInventoryStore } from '@/state/store';
 import { Button, NumberField, TextField, useToast } from '@/ui';
 import { useFocusFirstInvalid } from '../shared/forms';
 import { SettingsSection } from './SettingsSection';
 
-const WHOLE_NUMBER = 'Ingresa un número entero de 1 o más.';
-
-interface Drafts {
-  labName: string;
-  criticalDays: number | null;
-  warningDays: number | null;
-  defaultMinMonths: number | null;
-  defaultMaxMonths: number | null;
-}
+type Drafts = Omit<SettingsDraft, 'todayOverride'>;
 
 function toDrafts(settings: Settings): Drafts {
   return {
@@ -23,24 +17,6 @@ function toDrafts(settings: Settings): Drafts {
     defaultMinMonths: settings.defaultMinMonths,
     defaultMaxMonths: settings.defaultMaxMonths,
   };
-}
-
-const isPositive = (value: number | null): value is number => value !== null && value >= 1;
-
-function validate(d: Drafts): Partial<Record<keyof Drafts, string>> {
-  const errors: Partial<Record<keyof Drafts, string>> = {};
-  if (!d.labName.trim()) errors.labName = 'Escribe el nombre del laboratorio.';
-  if (!isPositive(d.criticalDays)) errors.criticalDays = WHOLE_NUMBER;
-  if (!isPositive(d.warningDays)) errors.warningDays = WHOLE_NUMBER;
-  else if (isPositive(d.criticalDays) && d.criticalDays >= d.warningDays) {
-    errors.warningDays = 'Los días de advertencia deben ser más que los días críticos.';
-  }
-  if (!isPositive(d.defaultMinMonths)) errors.defaultMinMonths = WHOLE_NUMBER;
-  if (!isPositive(d.defaultMaxMonths)) errors.defaultMaxMonths = WHOLE_NUMBER;
-  else if (isPositive(d.defaultMinMonths) && d.defaultMaxMonths < d.defaultMinMonths) {
-    errors.defaultMaxMonths = 'El máximo no puede ser menor que el mínimo.';
-  }
-  return errors;
 }
 
 /** Laboratory name, expiry alert thresholds and purchasing defaults, saved together. */
@@ -65,7 +41,7 @@ export function GeneralSettingsForm() {
     (value: Drafts[K]) =>
       setDrafts((current) => ({ ...current, [key]: value }));
 
-  const errors = validate(drafts);
+  const errors = validateSettings(drafts);
   const shown = (field: keyof Drafts) => (submitted ? errors[field] : undefined);
 
   const submit = (event: FormEvent) => {
@@ -75,13 +51,14 @@ export function GeneralSettingsForm() {
       focusFirstInvalid();
       return;
     }
-    useInventoryStore.getState().updateSettings({
+    const result = useInventoryStore.getState().updateSettings({
       labName: drafts.labName.trim(),
       criticalDays: drafts.criticalDays!,
       warningDays: drafts.warningDays!,
       defaultMinMonths: drafts.defaultMinMonths!,
       defaultMaxMonths: drafts.defaultMaxMonths!,
     });
+    if (!result.ok) return;
     setSubmitted(false);
     toast.show({ message: 'Ajustes guardados' });
   };
@@ -93,6 +70,7 @@ export function GeneralSettingsForm() {
           label="Nombre del laboratorio"
           value={drafts.labName}
           onChange={set('labName')}
+          maxLength={LIMITS.longText}
           error={shown('labName')}
           autoComplete="organization"
         />
@@ -106,6 +84,7 @@ export function GeneralSettingsForm() {
           label="Días para estado crítico"
           value={drafts.criticalDays}
           onChange={set('criticalDays')}
+          max={LIMITS.maxSettingDays}
           error={shown('criticalDays')}
           help="Un lote que vence en este número de días o menos se marca como crítico."
         />
@@ -113,6 +92,7 @@ export function GeneralSettingsForm() {
           label="Días para advertencia"
           value={drafts.warningDays}
           onChange={set('warningDays')}
+          max={LIMITS.maxSettingDays}
           error={shown('warningDays')}
           help="Un lote que vence en este número de días o menos (y no es crítico) se marca con advertencia."
         />
@@ -126,6 +106,7 @@ export function GeneralSettingsForm() {
           label="Existencia mínima por defecto (meses de consumo)"
           value={drafts.defaultMinMonths}
           onChange={set('defaultMinMonths')}
+          max={LIMITS.maxSettingMonths}
           error={shown('defaultMinMonths')}
           help="Por debajo de esta cobertura se sugiere comprar."
         />
@@ -133,6 +114,7 @@ export function GeneralSettingsForm() {
           label="Existencia máxima por defecto (meses de consumo)"
           value={drafts.defaultMaxMonths}
           onChange={set('defaultMaxMonths')}
+          max={LIMITS.maxSettingMonths}
           error={shown('defaultMaxMonths')}
           help="Tope de la cantidad sugerida de compra."
         />
