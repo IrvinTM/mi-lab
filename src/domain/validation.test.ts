@@ -218,8 +218,7 @@ describe('validateReceipt', () => {
         validateReceipt(receipt({ sourceCode: null }), receiptContext).errors.sourceCode,
       ).toBeUndefined();
       expect(
-        validateReceipt(receipt({ sourceCode: 1 }), receiptContext).errors
-          .sourceCode,
+        validateReceipt(receipt({ sourceCode: 1 }), receiptContext).errors.sourceCode,
       ).toBeUndefined();
       expect(
         validateReceipt(receipt({ sourceCode: 16 }), receiptContext).errors.sourceCode,
