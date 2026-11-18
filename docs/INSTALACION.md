@@ -73,7 +73,7 @@ pnpm run dist:win          # genera release/Mi-lab-Setup-<versión>.exe (requier
 ```
 
 - **Versión:** sale de `version` en `package.json`. Para publicar: cambia la versión, haz commit y
-  crea la etiqueta `v<versión>` (`git tag v1.0.1 && git push --tags`); el workflow adjunta el
+  crea la etiqueta `v<versión>` (`git tag v1.0.2 && git push --tags`); el workflow adjunta el
   instalador al Release.
 - **Sin firma de código:** el `.exe` no está firmado, por eso SmartScreen avisa. Firmarlo requiere
   un certificado de firma de código (EV elimina el aviso desde el primer día); electron-builder lo

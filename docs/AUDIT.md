@@ -204,10 +204,13 @@ form-action 'none'`. No hace falta `'unsafe-inline'`: no hay `<script>` ni `<sty
   exige `version === 1` más las cinco listas principales en `backupTextError`; las carpetas de
   datos/respaldos se crean y ajustan con modo `0o700` y los archivos (`mi-lab.db`, `-wal`, `-shm`,
   respaldos y temporales) con `0o600` en POSIX; `will-download` cancela cualquier extensión distinta
-  de `.json` o `.xlsx`; se amplía `FORBIDDEN_SWITCHES` (`--no-sandbox`, `--disable-web-security`,
+  de `.json` o `.xlsx`; se amplía `FORBIDDEN_SWITCHES` (`--disable-web-security`,
   `--renderer-cmd-prefix`, `--gpu-launcher`, `--utility-cmd-prefix`, `--browser-subprocess-path`) y
   se fijan `setWebRTCIPHandlingPolicy('disable_non_proxied_udp')` y `host-resolver-rules` (`MAP *
-~NOTFOUND , EXCLUDE mi-lab`) para cubrir UDP/STUN y DNS fuera de `webRequest`.
+~NOTFOUND , EXCLUDE mi-lab`) para cubrir UDP/STUN y DNS fuera de `webRequest`. `--no-sandbox` no
+  se prohíbe: el lanzador de la AppImage (`AppRun`) lo añade solo donde el kernel no permite el
+  sandbox de Chromium (Ubuntu 23.10+ restringe los user namespaces con AppArmor), y prohibirlo hacía
+  que la AppImage se cerrara al abrir sin ningún mensaje.
 - **Sin hallazgos:** no hay `dangerouslySetInnerHTML`, `innerHTML`, `eval`, `new Function` ni
   `target="_blank"`; todos los `href` se construyen con rutas fijas + `encodeURIComponent`, así que
   no puede colarse `javascript:`; `?producto=` y `?lote=` solo se usan si coinciden con un id

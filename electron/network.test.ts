@@ -79,13 +79,14 @@ describe('desktop network isolation', () => {
     const has = (present: string[]) => (name: string) => present.includes(name);
     expect(forbiddenSwitch(has([]))).toBeUndefined();
     expect(forbiddenSwitch(has(['lang', 'host-resolver-rules']))).toBeUndefined();
+    // The AppImage launcher adds --no-sandbox where the kernel forbids the Chromium sandbox.
+    expect(forbiddenSwitch(has(['no-sandbox']))).toBeUndefined();
     expect(FORBIDDEN_SWITCHES).toEqual([
       'remote-debugging-port',
       'remote-debugging-pipe',
       'remote-debugging-address',
       'remote-allow-origins',
       'js-flags',
-      'no-sandbox',
       'disable-web-security',
       'renderer-cmd-prefix',
       'gpu-launcher',

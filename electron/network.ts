@@ -106,7 +106,8 @@ export const FORBIDDEN_SWITCHES = [
   'remote-debugging-address',
   'remote-allow-origins',
   'js-flags',
-  'no-sandbox',
+  // Not 'no-sandbox': the AppImage launcher (AppRun) adds it itself where the kernel forbids the
+  // Chromium sandbox (Ubuntu 23.10+ AppArmor userns restriction), so forbidding it stops the app.
   'disable-web-security',
   'renderer-cmd-prefix',
   'gpu-launcher',
