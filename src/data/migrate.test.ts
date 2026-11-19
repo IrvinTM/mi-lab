@@ -242,3 +242,48 @@ describe('migrate: recoverable problems are sanitized', () => {
     expect(migrated.movements[0]).not.toHaveProperty('sourceCode');
   });
 });
+
+describe('migrate: lot corrections (T9.5)', () => {
+  const change = {
+    id: 'c1',
+    lotId: 'l1',
+    field: 'expiryDate',
+    from: '2027-05-31',
+    to: '2027-06-30',
+    reason: 'Error de digitación',
+    createdAt: '2026-11-19T10:00:00.000Z',
+  };
+
+  it('keeps valid corrections and omits the list when there are none', () => {
+    const data = { ...sampleData(), lotChanges: [change] };
+    expect(migrate(asJson(data))).toEqual(data);
+    expect(migrate(asJson(sampleData()))).not.toHaveProperty('lotChanges');
+    expect(migrate(asJson({ ...sampleData(), lotChanges: [] }))).not.toHaveProperty('lotChanges');
+  });
+
+  it('drops corrections of lots that no longer exist and unknown keys', () => {
+    const data = {
+      ...sampleData(),
+      lotChanges: [
+        change,
+        { ...change, id: 'c2', lotId: 'gone' },
+        { ...change, id: 'c3', extra: 1 },
+      ],
+    };
+    expect(migrate(asJson(data)).lotChanges).toEqual([change, { ...change, id: 'c3' }]);
+  });
+
+  it('rejects corrupt corrections', () => {
+    const bad = (patch: Record<string, unknown>) => () =>
+      migrate(asJson({ ...sampleData(), lotChanges: [{ ...change, ...patch }] }));
+    expect(bad({ field: 'quantity' })).toThrow(/campo corregido desconocido/);
+    expect(bad({ reason: 5 })).toThrow(InvalidDataError);
+    expect(bad({ id: '' })).toThrow(/vacío/);
+    expect(() => migrate(asJson({ ...sampleData(), lotChanges: {} }))).toThrow(
+      /correcciones de lotes/,
+    );
+    expect(() => migrate(asJson({ ...sampleData(), lotChanges: [change, change] }))).toThrow(
+      /id repetido/,
+    );
+  });
+});

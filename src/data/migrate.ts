@@ -5,6 +5,8 @@ import type {
   FundingSource,
   InventoryData,
   Lot,
+  LotChange,
+  LotField,
   Movement,
   MovementType,
   Product,
@@ -36,6 +38,7 @@ const COLLECTION_NAMES = {
   products: 'productos',
   lots: 'lotes',
   movements: 'movimientos',
+  lotChanges: 'correcciones de lotes',
 } as const;
 
 type Collection = keyof typeof COLLECTION_NAMES;
@@ -127,8 +130,9 @@ function withOptional<T extends object>(base: T, optional: Record<string, unknow
 
 // --- Records ------------------------------------------------------------------------------------
 
-function readList(raw: RawRecord, key: Collection): RawRecord[] {
+function readList(raw: RawRecord, key: Collection, optional = false): RawRecord[] {
   const list = own(raw, key);
+  if (optional && list === undefined) return [];
   const name = COLLECTION_NAMES[key];
   if (!Array.isArray(list)) fail(`Al respaldo le falta la lista de ${name} ("${key}").`);
   if (list.length > LIMITS[key]) {
@@ -246,6 +250,29 @@ function readMovement(record: RawRecord, index: number): Movement {
   });
 }
 
+const LOT_FIELDS: readonly LotField[] = ['lotNumber', 'expiryDate', 'unitPrice', 'sourceCode'];
+
+function readLotChange(record: RawRecord, index: number): LotChange {
+  const where = `Corrección de lote n.º ${index + 1}`;
+  const field = own(record, 'field');
+  if (!LOT_FIELDS.includes(field as LotField)) fail(`${where}: campo corregido desconocido.`);
+  const createdAt = own(record, 'createdAt');
+  if (typeof createdAt !== 'string' || createdAt.length > LIMITS.shortText) {
+    fail(`${where}: falta "createdAt" o no es texto.`);
+  }
+  const change: LotChange = {
+    id: nonEmptyText(record, 'id', where, LIMITS.shortText),
+    lotId: nonEmptyText(record, 'lotId', where, LIMITS.shortText),
+    field: field as LotField,
+    reason: requiredText(record, 'reason', where, LIMITS.longText),
+    createdAt,
+  };
+  return withOptional(change, {
+    from: optionalText(record, 'from', LIMITS.shortText),
+    to: optionalText(record, 'to', LIMITS.shortText),
+  });
+}
+
 /** Unknown or invalid settings fall back to the defaults; extra keys are dropped. */
 function readSettings(raw: unknown): Settings {
   if (raw === undefined) return { ...DEFAULT_SETTINGS };
@@ -298,6 +325,7 @@ function assertIntegrity(data: InventoryData): void {
   assertUniqueIds(data.products, 'productos');
   assertUniqueIds(data.lots, 'lotes');
   assertUniqueIds(data.movements, 'movimientos');
+  assertUniqueIds(data.lotChanges ?? [], 'correcciones de lotes');
   const codes = new Set<number>();
   for (const { code } of data.fundingSources) {
     if (codes.has(code)) fail(`Hay procedencias con el código repetido ${code}.`);
@@ -363,8 +391,16 @@ export function migrate(raw: unknown): InventoryData {
     products: readList(raw, 'products').map(readProduct),
     lots: readList(raw, 'lots').map(readLot),
     movements: readList(raw, 'movements').map(readMovement),
+    lotChanges: readList(raw, 'lotChanges', true).map(readLotChange),
     settings: readSettings(own(raw, 'settings')),
   };
   assertIntegrity(data);
+  // The history of a lot that no longer exists is only audit text: drop it instead of rejecting
+  // the whole backup.
+  const lotIds = new Set(data.lots.map((lot) => lot.id));
+  const lotChanges = data.lotChanges!.filter((change) => lotIds.has(change.lotId));
+  // Only present when there are corrections: data saved before T9.5 round-trips unchanged.
+  if (lotChanges.length > 0) data.lotChanges = lotChanges;
+  else delete data.lotChanges;
   return data;
 }

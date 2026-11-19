@@ -482,6 +482,122 @@ describe('writeOffExpired', () => {
   });
 });
 
+describe('editLot (T9.5)', () => {
+  const edit = {
+    lotNumber: 'lt123456',
+    expiryDate: '2027-06-30',
+    unitPrice: null,
+    sourceCode: null,
+    reason: 'Factura',
+  };
+
+  it('corrects the lot, records each changed field and reprices its movements', async () => {
+    const { store, repository } = await readyStore();
+    store
+      .getState()
+      .issue({ productId: 'p1', date: TODAY, quantity: 5, lotId: 'l1', fefoOverrideReason: 'x' });
+    store.getState().adjust('l1', -1, 'Rotura');
+    const result = store.getState().editLot('l1', {
+      ...edit,
+      lotNumber: 'lt-nuevo',
+      expiryDate: '2027-07-31',
+      unitPrice: 0.75,
+      sourceCode: 3,
+      reason: '  Factura 123 ',
+    });
+    expect(result).toEqual({ ok: true, changeIds: ['id-3', 'id-4', 'id-5', 'id-6'] });
+    const { data } = store.getState();
+    expect(data.lots.find((lot) => lot.id === 'l1')).toMatchObject({
+      lotNumber: 'LT-NUEVO',
+      expiryDate: '2027-07-31',
+      unitPrice: 0.75,
+      sourceCode: 3,
+    });
+    const own = data.movements.filter((m) => m.lotId === 'l1');
+    expect(own.map((m) => [m.type, m.unitPrice, m.sourceCode])).toEqual([
+      ['receipt', 0.75, 3],
+      ['issue', 0.75, undefined],
+      ['adjustment', undefined, undefined],
+    ]);
+    expect(data.lotChanges).toEqual([
+      {
+        id: 'id-3',
+        lotId: 'l1',
+        field: 'lotNumber',
+        from: 'LT123456',
+        to: 'LT-NUEVO',
+        reason: 'Factura 123',
+        createdAt: NOW.toISOString(),
+      },
+      {
+        id: 'id-4',
+        lotId: 'l1',
+        field: 'expiryDate',
+        from: '2027-06-30',
+        to: '2027-07-31',
+        reason: 'Factura 123',
+        createdAt: NOW.toISOString(),
+      },
+      {
+        id: 'id-5',
+        lotId: 'l1',
+        field: 'unitPrice',
+        to: '0.75',
+        reason: 'Factura 123',
+        createdAt: NOW.toISOString(),
+      },
+      {
+        id: 'id-6',
+        lotId: 'l1',
+        field: 'sourceCode',
+        to: '3',
+        reason: 'Factura 123',
+        createdAt: NOW.toISOString(),
+      },
+    ]);
+    // Removing the price takes it off the movements too.
+    expect(
+      store
+        .getState()
+        .editLot('l1', { ...edit, lotNumber: 'LT-NUEVO', expiryDate: '2027-07-31', sourceCode: 3 })
+        .ok,
+    ).toBe(true);
+    const after = store.getState().data;
+    expect(after.lots.find((lot) => lot.id === 'l1')).not.toHaveProperty('unitPrice');
+    expect(after.movements.filter((m) => m.lotId === 'l1').every((m) => !('unitPrice' in m))).toBe(
+      true,
+    );
+    // Saved, and a valid backup.
+    await store.getState().flush();
+    expect(migrate(JSON.parse(JSON.stringify(await repository.load()))).lotChanges).toHaveLength(5);
+  });
+
+  it('refuses invalid input without changing anything', async () => {
+    const { store } = await readyStore();
+    const before = store.getState().data;
+    expect(failureOf(store.getState().editLot('l1', edit)).error).toBe(
+      'No hay cambios que guardar.',
+    );
+    expect(
+      failureOf(store.getState().editLot('l1', { ...edit, lotNumber: 'ltsoon' })).errors.lotNumber,
+    ).toMatch(/ya tiene un lote/);
+    expect(failureOf(store.getState().editLot('nope', edit)).error).toBe('No se encontró el lote.');
+    expect(store.getState().data).toBe(before);
+  });
+
+  it('undoing the receipt of an edited lot removes its corrections', async () => {
+    const { store } = await readyStore();
+    const received = store.getState().receive(receipt());
+    if (!received.ok) throw new Error('receive failed');
+    store
+      .getState()
+      .editLot(received.lotId, { ...edit, lotNumber: 'LT777', expiryDate: '2027-10-01' });
+    expect(store.getState().data.lotChanges).toHaveLength(1);
+    expect(store.getState().undo(received.movementIds)).toBe(true);
+    expect(store.getState().data).not.toHaveProperty('lotChanges');
+  });
+});
+
 describe('undo', () => {
   it('removes the movements and the lot a receipt created', async () => {
     const { store } = await readyStore();

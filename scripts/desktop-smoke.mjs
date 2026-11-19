@@ -73,6 +73,8 @@ const finish = () => {
 const SMOKE_PRODUCT = 'Producto de humo';
 const CLOSE_AREA = 'Área guardada al cerrar';
 const LEGACY_PRODUCT = 'Producto heredado';
+const SMOKE_LOT = 'SMOKE-1';
+const EDITED_LOT = 'SMOKE-2';
 const dbText = () =>
   ev(`window.miLabDesktop.db.load().then(r => r.ok ? r.text : 'ERROR ' + r.error)`);
 
@@ -88,7 +90,7 @@ if (phase === 'restart') {
     body.slice(0, 300),
   );
   const text = await dbText();
-  for (const name of [SMOKE_PRODUCT, LEGACY_PRODUCT, CLOSE_AREA]) {
+  for (const name of [SMOKE_PRODUCT, LEGACY_PRODUCT, CLOSE_AREA, EDITED_LOT, 'Prueba de humo']) {
     check(
       `after restart: "${name}" in the database`,
       text?.includes(name),
@@ -114,10 +116,22 @@ if (phase === 'restart') {
       .all()
       .map((r) => r.name);
     const version = db.prepare('PRAGMA user_version').get().user_version;
+    const corrections = db
+      .prepare("SELECT field FROM lot_changes WHERE lot_id = 'smoke-lot' ORDER BY pos")
+      .all()
+      .map((r) => r.field);
+    const integrity = db.prepare('PRAGMA integrity_check').get().integrity_check;
     db.close();
+    check(
+      'mi-lab.db has the 4 lot corrections',
+      JSON.stringify(corrections) ===
+        JSON.stringify(['lotNumber', 'expiryDate', 'unitPrice', 'sourceCode']),
+      corrections,
+    );
+    check('mi-lab.db integrity_check ok', integrity === 'ok', integrity);
     check('mi-lab.db read directly has the products', products.includes(SMOKE_PRODUCT), products);
     check('mi-lab.db read directly has the area saved on close', areas.includes(CLOSE_AREA), areas);
-    check('mi-lab.db schema version', version >= 1, version);
+    check('mi-lab.db schema version 2 (lot_changes)', version === 2, version);
   } catch (error) {
     check('mi-lab.db readable with node:sqlite', false, String(error));
   }
@@ -346,6 +360,90 @@ check(
   await ev(`document.body.innerText.slice(0,300)`),
 );
 check('created product is in SQLite', (await dbText())?.includes(SMOKE_PRODUCT));
+// "Editar lote" (T9.5): a lot of the smoke product is written to the database, the page reloads it,
+// and the four fields are corrected through the sheet. Phase 2 checks they survived the restart.
+{
+  const data = JSON.parse(await dbText());
+  const product = data.products.find((p) => p.name === SMOKE_PRODUCT);
+  if (!data.fundingSources.some((s) => s.code === 1))
+    data.fundingSources.push({ code: 1, name: 'GOES' });
+  data.lots.push({
+    id: 'smoke-lot',
+    productId: product.id,
+    lotNumber: SMOKE_LOT,
+    expiryDate: '2028-01-31',
+    receivedDate: '2026-01-02',
+    unitPrice: 0.5,
+  });
+  data.movements.push({
+    id: 'smoke-receipt',
+    type: 'receipt',
+    date: '2026-01-02',
+    productId: product.id,
+    lotId: 'smoke-lot',
+    quantity: 10,
+    unitPrice: 0.5,
+    concept: 'Compra',
+    createdAt: '2026-01-02T08:00:00.000Z',
+  });
+  const saved = await ev(`window.miLabDesktop.db.save(${JSON.stringify(JSON.stringify(data))})`);
+  check('lot written for "Editar lote"', saved?.ok === true, JSON.stringify(saved));
+  await send('Page.reload', {});
+  await sleep(3000);
+  await goto(`/productos/${product.id}`);
+  check(
+    'click Editar lote',
+    (await clickText('button', `Editar el lote ${SMOKE_LOT}`)) === 'ok',
+    await ev(`document.body.innerText.slice(0, 300)`),
+  );
+  await sleep(800);
+  // React listens to "input" (text, date) and "change" (select); the value goes through the
+  // native setter so React sees the change.
+  const setField = (label, value, event = 'input') =>
+    ev(`(() => {
+      const l = [...document.querySelectorAll('dialog label')].find((x) => x.textContent.trim().startsWith(${JSON.stringify(label)}));
+      const el = l && document.getElementById(l.htmlFor);
+      if (!el) return 'missing';
+      Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set.call(el, ${JSON.stringify(value)});
+      el.dispatchEvent(new Event(${JSON.stringify(event)}, { bubbles: true }));
+      return 'ok';
+    })()`);
+  const fields = [
+    ['N.º de lote', EDITED_LOT],
+    ['Vencimiento', '2028-02-29'],
+    ['Precio unitario', '0.75'],
+    ['Procedencia', '1', 'change'],
+    ['Motivo de la corrección', 'Prueba de humo'],
+  ];
+  for (const [label, value, event] of fields) {
+    check(`edit lot: set ${label}`, (await setField(label, value, event)) === 'ok');
+  }
+  check('click Guardar cambios', (await clickText('dialog button', 'Guardar cambios')) === 'ok');
+  await sleep(1500);
+  const after = JSON.parse(await dbText());
+  const lot = after.lots.find((l) => l.id === 'smoke-lot');
+  check(
+    'edited lot saved in SQLite',
+    lot?.lotNumber === EDITED_LOT &&
+      lot.expiryDate === '2028-02-29' &&
+      lot.unitPrice === 0.75 &&
+      lot.sourceCode === 1,
+    JSON.stringify(lot),
+  );
+  check(
+    'lot history saved (4 corrections)',
+    after.lotChanges?.filter((c) => c.lotId === 'smoke-lot').length === 4,
+    JSON.stringify(after.lotChanges),
+  );
+  check(
+    'receipt repriced',
+    after.movements.find((m) => m.id === 'smoke-receipt')?.unitPrice === 0.75,
+  );
+  check(
+    'edited lot shown',
+    await ev(`document.body.innerText.includes(${JSON.stringify(EDITED_LOT)})`),
+  );
+}
 const errs = startupErrors().filter(
   (e) => !/example\.com|json\/list|json\/version|etc\/passwd|package\.json|main\.exe/.test(e),
 );

@@ -7,17 +7,26 @@ import { todayISO } from '@/domain/dates';
 import { allocateFefo, firstFefoLot } from '@/domain/fefo';
 import { LIMITS } from '@/domain/limits';
 import { lotBalance, lotBalances, productStock } from '@/domain/stock';
-import type { InventoryData, ISODate, Movement, Product, Settings } from '@/domain/types';
+import type {
+  InventoryData,
+  ISODate,
+  LotChange,
+  Movement,
+  Product,
+  Settings,
+} from '@/domain/types';
 import {
   ADJUSTMENT_CONCEPT_PREFIX,
   findExistingLot,
   isValid,
+  lotEditChanges,
   normalizeLotNumber,
   validateAdjustment,
   validateAreaName,
   validateFundingSourceCode,
   validateFundingSourceName,
   validateIssue,
+  validateLotEdit,
   validateProduct,
   validateReceipt,
   validateSettings,
@@ -35,6 +44,17 @@ export interface ReceiveInput {
   concept?: string;
   sourceCode?: number;
   unitPrice?: number;
+}
+
+/** "Editar lote": the corrected values (all of them, changed or not) and why. */
+export interface LotEditInput {
+  lotNumber: string;
+  expiryDate: ISODate;
+  /** USD per base unit; `null` removes the price. */
+  unitPrice: number | null;
+  /** `null` = not specified. */
+  sourceCode: number | null;
+  reason: string;
 }
 
 export interface IssueInput {
@@ -79,6 +99,12 @@ export interface InventoryState {
   issue(input: IssueInput): ActionResult<{ movementIds: string[] }>;
   adjust(lotId: string, delta: number, reason: string): ActionResult<{ movementIds: string[] }>;
   writeOffExpired(lotId: string): ActionResult<{ movementIds: string[] }>;
+  /**
+   * Corrects the lot number, expiry date, price and source of a lot, recording each changed field
+   * in `lotChanges`. The new price replaces the price of the lot's movements, and the new source
+   * the source of its receipts.
+   */
+  editLot(lotId: string, input: LotEditInput): ActionResult<{ changeIds: string[] }>;
   /** Deletes those movements and the lots left without movements. False if it would leave a negative balance. */
   undo(movementIds: string[]): boolean;
   upsertProduct(product: Product): ActionResult;
@@ -127,6 +153,17 @@ function emptyData(): InventoryData {
     movements: [],
     settings: { ...DEFAULT_SETTINGS },
   };
+}
+
+/** `record` with `key` set to `value`, or without `key` when `value` is null. */
+function withNumber<T extends object, K extends keyof T & string>(
+  record: T,
+  key: K,
+  value: number | null,
+): T {
+  const copy: Partial<T> = { ...record };
+  delete copy[key];
+  return (value === null ? copy : { ...copy, [key]: value }) as T;
 }
 
 function failure(errors: Record<string, string>): ActionFailure {
@@ -408,13 +445,84 @@ export function createInventoryStore(repository: InventoryRepository, options: S
         return { ok: true, movementIds: movements.map((m) => m.id) };
       },
 
+      editLot(lotId, input) {
+        const { data } = get();
+        const lot = data.lots.find((l) => l.id === lotId);
+        if (!lot) return failure({ form: 'No se encontró el lote.' });
+        const check = validateLotEdit(input, {
+          lot,
+          lots: data.lots,
+          fundingSources: data.fundingSources,
+          today: today(),
+        });
+        if (!isValid(check)) return failure(check.errors);
+        const previous = data.lotChanges ?? [];
+        const changes = lotEditChanges(lot, input);
+        if (previous.length + changes.length > LIMITS.lotChanges) {
+          return failure({ form: `Se alcanzó el máximo de ${LIMITS.lotChanges} correcciones.` });
+        }
+
+        const stamp = createdAt();
+        const reason = input.reason.trim();
+        const records: LotChange[] = changes.map((change) => ({
+          id: newId(),
+          lotId,
+          ...change,
+          reason,
+          createdAt: stamp,
+        }));
+        const edited = withNumber(
+          withNumber(
+            {
+              ...lot,
+              lotNumber: normalizeLotNumber(input.lotNumber),
+              expiryDate: input.expiryDate,
+            },
+            'unitPrice',
+            input.unitPrice,
+          ),
+          'sourceCode',
+          input.sourceCode,
+        );
+        const changed = new Set(changes.map((change) => change.field));
+        const movements =
+          changed.has('unitPrice') || changed.has('sourceCode')
+            ? data.movements.map((movement) => {
+                if (movement.lotId !== lotId) return movement;
+                let next = movement;
+                // Adjustments carry no price of their own (reports use the lot's).
+                if (changed.has('unitPrice') && movement.type !== 'adjustment') {
+                  next = withNumber(next, 'unitPrice', input.unitPrice);
+                }
+                // Only receipts record the source.
+                if (changed.has('sourceCode') && movement.type === 'receipt') {
+                  next = withNumber(next, 'sourceCode', input.sourceCode);
+                }
+                return next;
+              })
+            : data.movements;
+        setData({
+          ...data,
+          lots: data.lots.map((l) => (l.id === lotId ? edited : l)),
+          movements,
+          lotChanges: [...previous, ...records],
+        });
+        return { ok: true, changeIds: records.map((record) => record.id) };
+      },
+
       undo(movementIds) {
         const { data } = get();
         const removed = new Set(movementIds);
         const movements = data.movements.filter((m) => !removed.has(m.id));
         const withMovements = new Set(movements.map((m) => m.lotId));
         const lots = data.lots.filter((lot) => withMovements.has(lot.id));
-        const next = { ...data, movements, lots };
+        const next: InventoryData = { ...data, movements, lots };
+        // The corrections of a lot that is gone go with it.
+        if (data.lotChanges && lots.length !== data.lots.length) {
+          const kept = data.lotChanges.filter((change) => withMovements.has(change.lotId));
+          if (kept.length > 0) next.lotChanges = kept;
+          else delete next.lotChanges;
+        }
         for (const balance of lotBalances(next).values()) {
           if (balance < -1e-9) return false;
         }

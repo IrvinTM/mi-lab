@@ -115,6 +115,83 @@ jobs:
           if (-not (Test-Path $db)) { throw 'El desinstalador borró la base de datos' }
           Write-Host "Instalación, apertura y desinstalación correctas; datos conservados en $data"
 
+      # 4) The update (docs/INSTALACION.md §5) with real data, as it happens in the lab: the last
+      # published version is installed (checksum verified), opened once (it creates mi-lab.db),
+      # filled with ≈ 5,500 movements, opened again (it must read them) and left OPEN while this
+      # installer runs over it. The new version must open with the same data: every table
+      # identical, integrity and references intact, the schema upgraded and a copy of the
+      # database as it was (mi-lab.db.v<old>.bak). A window titled "<page> · Mi-lab" means the
+      # page loaded the data (the error screen keeps the plain "Mi-lab" title).
+      - name: Prueba de actualización (versión publicada → esta, con datos y la app abierta)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $current = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tag = gh release list --repo $env:GITHUB_REPOSITORY --exclude-drafts --exclude-pre-releases --json tagName --jq '.[].tagName' |
+            Where-Object { $_ -ne "v$current" } | Select-Object -First 1
+          if (-not $tag) { throw 'No hay una versión publicada para probar la actualización' }
+          Write-Host "Actualización: $tag → v$current"
+          New-Item -ItemType Directory -Force upgrade | Out-Null
+          gh release download $tag --repo $env:GITHUB_REPOSITORY --dir upgrade --pattern 'Mi-lab-Setup-*.exe' --pattern 'SHA256SUMS.txt'
+          $old = Get-ChildItem upgrade/Mi-lab-Setup-*.exe
+          $sum = (Select-String -Path upgrade/SHA256SUMS.txt -SimpleMatch $old.Name).Line.Split(' ')[0]
+          if ((Get-FileHash $old.FullName -Algorithm SHA256).Hash.ToLower() -ne $sum) { throw "Suma SHA-256 distinta para $($old.Name)" }
+
+          $exe = Join-Path $env:LOCALAPPDATA 'Programs/Mi-lab/Mi-lab.exe'
+          $data = Join-Path $env:APPDATA 'Mi-lab'
+          $db = Join-Path $data 'mi-lab.db'
+          function Open-App {
+            $p = Start-Process -PassThru -FilePath $exe
+            $title = ''
+            for ($n = 0; $n -lt 60 -and -not ($title -like '* · Mi-lab'); $n++) {
+              Start-Sleep -Seconds 1
+              if ($p.HasExited) { throw "Mi-lab se cerró al abrir (código $($p.ExitCode))" }
+              $title = (Get-Process -Id $p.Id -ErrorAction SilentlyContinue).MainWindowTitle
+            }
+            if (-not ($title -like '* · Mi-lab')) { throw "La app no cargó los datos (título: '$title')" }
+            Write-Host "Abierta: $title"
+            Start-Sleep -Seconds 2
+            return $p
+          }
+          function Close-App($p) {
+            $p.CloseMainWindow() | Out-Null
+            if (-not $p.WaitForExit(20000)) { throw 'Mi-lab no se cerró' }
+          }
+          function Invoke-Check { node @args; if ($LASTEXITCODE -ne 0) { throw "Falló: node $args" } }
+
+          # Clean machine with the published version.
+          Get-Process Mi-lab, electron -ErrorAction SilentlyContinue | Stop-Process -Force
+          $uninstaller = Join-Path $env:LOCALAPPDATA 'Programs/Mi-lab/Uninstall Mi-lab.exe'
+          if (Test-Path $uninstaller) { Start-Process -Wait -FilePath $uninstaller -ArgumentList '/S' }
+          Start-Sleep -Seconds 3
+          Remove-Item -Recurse -Force $data -ErrorAction SilentlyContinue
+          $i = Start-Process -PassThru -Wait -FilePath $old.FullName -ArgumentList '/S'
+          if ($i.ExitCode -ne 0) { throw "El instalador $tag terminó con código $($i.ExitCode)" }
+          Close-App (Open-App)
+          Invoke-Check scripts/upgrade-test.mjs seed $db
+          Close-App (Open-App)
+          Invoke-Check scripts/upgrade-test.mjs dump $db upgrade/before.json
+
+          # Update with the old version open.
+          $running = Open-App
+          $new = (Get-ChildItem release/Mi-lab-Setup-*.exe).FullName
+          $u = Start-Process -PassThru -Wait -FilePath $new -ArgumentList '/S'
+          if ($u.ExitCode -ne 0) { throw "El instalador nuevo terminó con código $($u.ExitCode)" }
+          Start-Sleep -Seconds 3
+          if (-not $running.HasExited) { throw 'La versión anterior siguió abierta después de actualizar' }
+          $version = (Get-Item $exe).VersionInfo.ProductVersion
+          if (-not $version.StartsWith($current)) { throw "Versión instalada $version, se esperaba $current" }
+          Write-Host "Instalada la versión $version"
+
+          # The new version migrates on open; a second opening changes nothing.
+          Close-App (Open-App)
+          Invoke-Check scripts/upgrade-test.mjs verify $db upgrade/before.json 2
+          Close-App (Open-App)
+          Invoke-Check scripts/upgrade-test.mjs verify $db upgrade/before.json 2
+          Get-ChildItem $data | Format-Table Name, Length
+
       - name: Suma SHA-256 del instalador
         shell: pwsh
         run: |

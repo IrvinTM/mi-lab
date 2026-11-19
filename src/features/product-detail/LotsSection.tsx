@@ -11,6 +11,7 @@ import { useAdjust } from '../shared/useAdjust';
 import { useWriteOff } from '../shared/useWriteOff';
 import { ExpiryBadge } from '../shared/StatusBadges';
 import { sourceName } from './sourceName';
+import { useEditLot } from './useEditLot';
 
 interface LotsSectionProps {
   row: ProductRow;
@@ -36,6 +37,17 @@ export function LotsSection({ row, today, settings, fundingSources }: LotsSectio
   const firstId = firstFefoLot(row.stock.lots, today)?.lot.id;
   const { requestAdjust, dialog: adjustDialog } = useAdjust();
   const { requestWriteOff, dialog: writeOffDialog } = useWriteOff();
+  const { requestEdit, dialog: editDialog } = useEditLot();
+  const editButton = ({ lot }: LotBalance) => (
+    <Button
+      size="sm"
+      variant="plain"
+      aria-label={`Editar el lote ${lot.lotNumber}`}
+      onClick={() => requestEdit({ lot, productName: row.product.name, unit: row.product.unit })}
+    >
+      Editar
+    </Button>
+  );
   const target = ({ lot, balance }: LotBalance) => ({
     lotId: lot.id,
     lotNumber: lot.lotNumber,
@@ -48,14 +60,17 @@ export function LotsSection({ row, today, settings, fundingSources }: LotsSectio
     header: 'Acciones',
     className: 'whitespace-nowrap',
     cell: (entry) => (
-      <Button
-        size="sm"
-        variant="plain"
-        aria-label={`Ajustar saldo del lote ${entry.lot.lotNumber}`}
-        onClick={() => requestAdjust(target(entry))}
-      >
-        Ajustar
-      </Button>
+      <span className="flex items-center gap-1">
+        {editButton(entry)}
+        <Button
+          size="sm"
+          variant="plain"
+          aria-label={`Ajustar saldo del lote ${entry.lot.lotNumber}`}
+          onClick={() => requestAdjust(target(entry))}
+        >
+          Ajustar
+        </Button>
+      </span>
     ),
   };
   const writeOffColumn: TableColumn<LotBalance> = {
@@ -72,6 +87,7 @@ export function LotsSection({ row, today, settings, fundingSources }: LotsSectio
         >
           Dar de baja
         </Button>
+        {editButton(entry)}
         <Button
           size="sm"
           variant="plain"
@@ -138,7 +154,7 @@ export function LotsSection({ row, today, settings, fundingSources }: LotsSectio
     {
       key: 'projection',
       header: 'Proyección',
-      className: 'min-w-56',
+      className: 'min-w-40',
       cell: ({ lot }) => projectionText(row, lot.id),
     },
     adjustColumn,
@@ -169,6 +185,7 @@ export function LotsSection({ row, today, settings, fundingSources }: LotsSectio
       ) : null}
       {adjustDialog}
       {writeOffDialog}
+      {editDialog}
     </section>
   );
 }

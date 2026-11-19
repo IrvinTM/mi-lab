@@ -66,6 +66,22 @@ export interface Movement {
   createdAt: string;
 }
 
+/** Lot fields that can be corrected after the receipt (T9.5). */
+export type LotField = 'lotNumber' | 'expiryDate' | 'unitPrice' | 'sourceCode';
+
+/** One corrected field of a lot: the audit trail of "Editar lote". */
+export interface LotChange {
+  id: string;
+  lotId: string;
+  field: LotField;
+  /** Value as text: lot number, 'YYYY-MM-DD', price (USD per base unit) or source code. Absent = empty. */
+  from?: string;
+  to?: string;
+  reason: string;
+  /** ISO datetime of the correction. */
+  createdAt: string;
+}
+
 export interface Settings {
   labName: string;
   /** Default 30. */
@@ -87,5 +103,7 @@ export interface InventoryData {
   products: Product[];
   lots: Lot[];
   movements: Movement[];
+  /** Corrections of lot data, oldest first. Absent in data saved before T9.5 (= none). */
+  lotChanges?: LotChange[];
   settings: Settings;
 }

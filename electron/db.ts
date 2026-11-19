@@ -10,7 +10,7 @@
  * `data/migrate.ts` when it loads; here the tables only enforce types (STRICT), required fields
  * and references between records.
  */
-import { chmodSync, mkdirSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
@@ -92,6 +92,21 @@ export const MIGRATIONS: readonly ((db: DatabaseSync) => void)[] = [
         today_override TEXT
       ) STRICT;
     `),
+  // v2 (T9.5): corrections of lot data ("Editar lote").
+  (db) =>
+    db.exec(`
+      CREATE TABLE lot_changes (
+        id TEXT PRIMARY KEY,
+        pos INTEGER NOT NULL,
+        lot_id TEXT NOT NULL REFERENCES lots (id) DEFERRABLE INITIALLY DEFERRED,
+        field TEXT NOT NULL CHECK (field IN ('lotNumber', 'expiryDate', 'unitPrice', 'sourceCode')),
+        from_value TEXT,
+        to_value TEXT,
+        reason TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      ) STRICT;
+      CREATE INDEX lot_changes_lot ON lot_changes (lot_id);
+    `),
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;
@@ -108,7 +123,9 @@ interface Field {
 interface Table {
   name: string;
   /** Key of `InventoryData` holding this list. */
-  list: 'areas' | 'fundingSources' | 'products' | 'lots' | 'movements';
+  list: 'areas' | 'fundingSources' | 'products' | 'lots' | 'movements' | 'lotChanges';
+  /** The list may be absent from the page's data (saved before it existed): treated as empty. */
+  optional?: boolean;
   /** The id field; the first entry of `fields`. */
   fields: readonly Field[];
 }
@@ -168,6 +185,20 @@ const TABLES: readonly Table[] = [
       req('createdAt', 'created_at'),
     ],
   },
+  {
+    name: 'lot_changes',
+    list: 'lotChanges',
+    optional: true,
+    fields: [
+      req('id'),
+      req('lotId', 'lot_id'),
+      req('field'),
+      opt('from', 'from_value'),
+      opt('to', 'to_value'),
+      req('reason'),
+      req('createdAt', 'created_at'),
+    ],
+  },
 ];
 
 const SETTINGS_FIELDS: readonly Field[] = [
@@ -219,6 +250,7 @@ export interface InventoryJson {
   products: JsonRecord[];
   lots: JsonRecord[];
   movements: JsonRecord[];
+  lotChanges?: JsonRecord[];
   settings: JsonRecord;
 }
 
@@ -331,6 +363,8 @@ export class InventoryDb {
       products: lists.products!,
       lots: lists.lots!,
       movements: lists.movements!,
+      // Only when there are corrections: data saved before T9.5 reads back exactly as it was.
+      ...(lists.lotChanges!.length > 0 ? { lotChanges: lists.lotChanges! } : {}),
       settings,
     };
   }
@@ -361,7 +395,7 @@ export class InventoryDb {
     this.db.exec('BEGIN IMMEDIATE');
     try {
       this.tables.forEach(({ table, upsert, remove }, index) => {
-        const list = input[table.list];
+        const list = input[table.list] ?? (table.optional ? [] : undefined);
         if (!Array.isArray(list)) throw new TypeError(`Falta la lista "${table.list}".`);
         const before = previous.tables[index]!;
         const after: TableCache = new Map();
@@ -464,12 +498,36 @@ function hardenDbFilePermissions(file: string): void {
   }
 }
 
+/**
+ * Before an existing database is upgraded to a newer schema, a full copy of it is written next to
+ * it (`mi-lab.db.v<old version>.bak`, kept if it already exists): if a migration ever goes wrong,
+ * the data as it was can be recovered by hand. Nothing is copied for a new (empty) database.
+ */
+export function backupBeforeMigration(db: DatabaseSync, file: string): string | null {
+  if (isSpecialDbPath(file)) return null;
+  const current = (db.prepare('PRAGMA user_version').get() as { user_version: number })
+    .user_version;
+  if (current === 0 || current >= SCHEMA_VERSION) return null;
+  const copy = `${file}.v${current}.bak`;
+  if (!existsSync(copy)) {
+    // VACUUM INTO writes a consistent copy (WAL included) without closing the database.
+    db.exec(`VACUUM INTO '${copy.replaceAll("'", "''")}'`);
+    try {
+      chmodSync(copy, DB_FILE_MODE);
+    } catch {
+      // Permissions are best effort (see hardenDbFilePermissions).
+    }
+  }
+  return copy;
+}
+
 /** Opens (creating if needed) the database file and brings its schema up to date. */
 export function openInventoryDb(file: string): InventoryDb {
   ensureDbDir(file);
   const db = new DatabaseSync(file);
   hardenDbFilePermissions(file);
   try {
+    backupBeforeMigration(db, file);
     const inventory = new InventoryDb(db);
     hardenDbFilePermissions(file);
     return inventory;

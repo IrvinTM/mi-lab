@@ -1,5 +1,6 @@
 // @vitest-environment node
 /// <reference types="node" />
+import { existsSync } from 'node:fs';
 import { chmod, mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -169,6 +170,7 @@ describe('schema', () => {
     expect(tables).toEqual([
       'areas',
       'funding_sources',
+      'lot_changes',
       'lots',
       'movements',
       'products',
@@ -238,6 +240,63 @@ describe('schema', () => {
     const after = raw();
     expect(after.get('PRAGMA user_version').user_version).toBe(SCHEMA_VERSION + 1);
     after.close();
+  });
+
+  it('upgrading a database first copies it as it was, and keeps the data', () => {
+    // A database from v1.0.x: schema version 1, with an area and the settings saved.
+    const v1 = new DatabaseSync(file);
+    migrateSchema(v1, MIGRATIONS.slice(0, 1));
+    v1.exec(
+      "INSERT INTO areas (id, pos, name) VALUES ('a1', 1, 'Química'); INSERT INTO settings VALUES (1, 'Lab', 30, 90, 1, 3, NULL)",
+    );
+    v1.close();
+
+    const db = open();
+    expect(raw().get('PRAGMA user_version').user_version).toBe(SCHEMA_VERSION);
+    expect(db.load()?.areas).toEqual([{ id: 'a1', name: 'Química' }]);
+    const copy = raw(`${file}.v1.bak`);
+    expect(copy.get('PRAGMA user_version').user_version).toBe(1);
+    expect(copy.all('SELECT name FROM areas').map((row) => row.name)).toEqual(['Química']);
+    expect(copy.get("SELECT name FROM sqlite_schema WHERE name = 'lot_changes'")).toBeUndefined();
+  });
+
+  it('keeps the lot corrections (T9.5) and rejects one of a missing lot', () => {
+    const db = open();
+    const data: InventoryData = {
+      ...small(),
+      lotChanges: [
+        {
+          id: 'c1',
+          lotId: 'l2',
+          field: 'unitPrice',
+          from: '0.3',
+          to: '0.25',
+          reason: 'Factura',
+          createdAt: '2026-11-19T10:00:00.000Z',
+        },
+        {
+          id: 'c2',
+          lotId: 'l2',
+          field: 'sourceCode',
+          to: '7',
+          reason: 'Faltaba',
+          createdAt: '2026-11-19T10:00:00.000Z',
+        },
+      ],
+    };
+    db.save(data);
+    expect(db.load()).toStrictEqual(data);
+    const orphan = { ...data, lotChanges: [{ ...data.lotChanges![0]!, id: 'c3', lotId: 'nope' }] };
+    expect(() => db.save(orphan)).toThrow();
+    expect(db.load()).toStrictEqual(data);
+  });
+
+  it('a new database and an up-to-date one are not copied', () => {
+    open();
+    opened.pop()!.close();
+    open();
+    expect(existsSync(`${file}.v0.bak`)).toBe(false);
+    expect(existsSync(`${file}.v${SCHEMA_VERSION}.bak`)).toBe(false);
   });
 
   it.skipIf(process.platform === 'win32')(

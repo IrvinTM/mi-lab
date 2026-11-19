@@ -2,7 +2,7 @@ import { daysUntil, isValidISODate } from './dates';
 import { LIMITS } from './limits';
 import { countNoun } from './plural';
 import { normalizeText } from './text';
-import type { Area, FundingSource, ISODate, Lot, Product, Settings } from './types';
+import type { Area, FundingSource, ISODate, Lot, LotField, Product, Settings } from './types';
 
 export { LIMITS };
 
@@ -244,6 +244,122 @@ export function validateAdjustment(
     errors.reason = `El motivo no puede superar ${MAX_ADJUSTMENT_REASON} caracteres.`;
   }
   return errors;
+}
+
+// --- Lot correction (editar lote, T9.5) ------------------------------------------------------
+
+export interface LotEditForm {
+  lotNumber: string;
+  expiryDate: string;
+  /** USD per base unit; `null` = no price. */
+  unitPrice: number | null;
+  /** Funding source code; `null` = not specified. */
+  sourceCode: number | null;
+  reason: string;
+}
+
+export interface LotEditChange {
+  field: LotField;
+  /** Text form of the value (see `LotChange`); `undefined` = empty. */
+  from?: string;
+  to?: string;
+}
+
+const numberText = (value: number | null | undefined): string | undefined =>
+  value === null || value === undefined ? undefined : String(value);
+
+/** The fields that `form` changes on `lot`, in a fixed order (lot number, expiry, price, source). */
+export function lotEditChanges(lot: Lot, form: LotEditForm): LotEditChange[] {
+  const changes: LotEditChange[] = [];
+  const lotNumber = normalizeLotNumber(form.lotNumber);
+  if (lotNumber !== lot.lotNumber) {
+    changes.push({ field: 'lotNumber', from: lot.lotNumber, to: lotNumber });
+  }
+  if (form.expiryDate !== lot.expiryDate) {
+    changes.push({ field: 'expiryDate', from: lot.expiryDate, to: form.expiryDate });
+  }
+  const numbers: [LotField, number | undefined, number | null][] = [
+    ['unitPrice', lot.unitPrice, form.unitPrice],
+    ['sourceCode', lot.sourceCode, form.sourceCode],
+  ];
+  for (const [field, old, value] of numbers) {
+    const before = numberText(old);
+    const after = numberText(value);
+    if (before === after) continue;
+    changes.push({
+      field,
+      ...(before !== undefined ? { from: before } : {}),
+      ...(after !== undefined ? { to: after } : {}),
+    });
+  }
+  return changes;
+}
+
+/**
+ * Corrects the lot number, expiry date, price and source of a received lot. The quantity is not
+ * edited here (that is an adjustment) and the product never changes.
+ */
+export function validateLotEdit(
+  form: LotEditForm,
+  context: {
+    lot: Lot;
+    lots: readonly Lot[];
+    fundingSources: readonly FundingSource[];
+    today: ISODate;
+  },
+): ValidationResult {
+  const errors: Record<string, string> = {};
+  const warnings: Record<string, string> = {};
+  const { lot, lots, fundingSources, today } = context;
+
+  const lotNumber = normalizeLotNumber(form.lotNumber);
+  if (!lotNumber) {
+    errors.lotNumber = 'Ingresa el número de lote.';
+  } else if (lotNumber.length > LIMITS.shortText) {
+    errors.lotNumber = `El número de lote no puede superar ${LIMITS.shortText} caracteres.`;
+  } else {
+    const other = findExistingLot(lots, lot.productId, lotNumber);
+    if (other && other.id !== lot.id) {
+      errors.lotNumber = `Este producto ya tiene un lote ${lotNumber}.`;
+    }
+  }
+
+  if (!form.expiryDate) {
+    errors.expiryDate = 'Ingresa la fecha de vencimiento.';
+  } else if (!isValidISODate(form.expiryDate)) {
+    errors.expiryDate = 'Ingresa una fecha de vencimiento válida.';
+  } else if (form.expiryDate <= lot.receivedDate) {
+    errors.expiryDate = 'El vencimiento debe ser posterior a la fecha de entrada del lote.';
+  } else if (form.expiryDate !== lot.expiryDate && form.expiryDate < today) {
+    warnings.expiryDate = 'Con esta fecha el lote queda vencido.';
+  }
+
+  if (form.unitPrice !== null) {
+    if (!Number.isFinite(form.unitPrice) || form.unitPrice < 0) {
+      errors.unitPrice = 'El precio no puede ser negativo.';
+    } else if (form.unitPrice > LIMITS.maxNumber) {
+      errors.unitPrice = `El precio no puede superar ${MAX_NUMBER_TEXT}.`;
+    }
+  }
+
+  if (
+    form.sourceCode !== null &&
+    form.sourceCode !== lot.sourceCode &&
+    !fundingSources.some((source) => source.code === form.sourceCode)
+  ) {
+    errors.sourceCode = 'Elige una procedencia válida.';
+  }
+
+  const reason = form.reason.trim();
+  if (!reason) errors.reason = 'Escribe el motivo de la corrección.';
+  else if (reason.length > LIMITS.longText) {
+    errors.reason = `El motivo no puede superar ${LIMITS.longText} caracteres.`;
+  }
+
+  if (Object.keys(errors).length === 0 && lotEditChanges(lot, form).length === 0) {
+    errors.form = 'No hay cambios que guardar.';
+  }
+  return { errors, warnings };
 }
 
 // --- Catalog & settings ------------------------------------------------------------------------

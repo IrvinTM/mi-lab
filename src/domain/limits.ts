@@ -9,6 +9,7 @@ export const LIMITS = {
   products: 50_000,
   lots: 200_000,
   movements: 1_000_000,
+  lotChanges: 200_000,
   /** Ids, codes, card numbers, packaging, lot numbers, units… */
   shortText: 120,
   /** Names, concepts, reasons. */

@@ -222,7 +222,20 @@ export interface InventoryData {
   products: Product[];
   lots: Lot[];
   movements: Movement[];
+  lotChanges?: LotChange[];   // correcciones de lotes (T9.5); ausente = ninguna
   settings: Settings;
+}
+
+// T9.5: un registro por campo corregido con "Editar lote".
+export type LotField = 'lotNumber' | 'expiryDate' | 'unitPrice' | 'sourceCode';
+export interface LotChange {
+  id: string;
+  lotId: string;
+  field: LotField;
+  from?: string;              // valor anterior como texto; ausente = vacío
+  to?: string;
+  reason: string;             // obligatorio
+  createdAt: string;          // ISO datetime
 }
 
 export interface Settings {
@@ -629,6 +642,7 @@ issue(input: IssueInput): { ok: true; movementIds: string[] } | { ok: false; err
 adjust(lotId, delta, reason): void
 writeOffExpired(lotId): void
 undo(movementIds: string[]): void       // borra esos movimientos y lotes que queden huérfanos
+editLot(lotId, { lotNumber, expiryDate, unitPrice, sourceCode, reason }) // T9.5, con historial
 upsertProduct(p: Product): void
 updateSettings(patch: Partial<Settings>): void
 resetToSeed(): Promise<void>            // el seed es un chunk aparte (import())
@@ -775,6 +789,11 @@ librería va con `import()`); el informe usa las mismas derivaciones que la pant
   y migraciones, guardado por diferencias en una transacción), IPC `mi-lab:db-*` con origen
   verificado, `DesktopRepository` con migración verificada desde `localStorage`, guardado de lo
   pendiente al cerrar la ventana. Web sin cambios. Prueba de humo en dos fases (con reinicio) en CI.
+- [x] **T9.5** Editar lote (pedido de los usuarios): en el detalle del producto, "Editar" en cada
+  lote corrige N.º de lote, vencimiento, precio unitario y procedencia con motivo obligatorio. Cada
+  campo cambiado queda en `lotChanges` (historial visible en la misma hoja); la cantidad sigue
+  corrigiéndose con "Ajustar" y el producto no se cambia. Tabla `lot_changes` en SQLite (esquema
+  v2) con copia `mi-lab.db.v1.bak` antes de migrar.
 
 ## 11. Protocolo para agentes
 
@@ -867,3 +886,4 @@ librería va con `import()`); el informe usa las mismas derivaciones que la pant
 | 2026-11-15 | Las descargas (respaldo JSON y `.xlsx`) usan el diálogo nativo "Guardar como" de Electron (no se fija ruta en `will-download`; solo se añade el filtro de tipo). El instalador no está firmado: SmartScreen avisa (documentado en `docs/INSTALACION.md`). La versión del instalador sale de `package.json` (pasó de 0.0.0 a 1.0.0) | Flujo simple para usuarios; la firma requiere un certificado de pago |
 | 2026-11-16 | **Seguridad (T9.3)**: el proceso principal cancela toda petición que no sea `app://mi-lab`, `data:` o `blob:` propio (`electron/network.ts`); los archivos de la app se leen del `app.asar` con `fs` (no hay `file://`) y se sirven con la CSP como cabecera (+ `frame-ancestors 'none'`, `nosniff`); sin `shell.openExternal`; `isAppUrl` compara esquema y host porque Node da a `app://` el origen opaco `'null'` (antes el IPC de respaldos rechazaba siempre). Fusibles: sin RunAsNode, NODE_OPTIONS ni --inspect, solo `app.asar` con integridad. Dependencias exactas (`savePrefix: ''`), `minimumReleaseAge` 3 días (excepción revisada: `electron@45.3.2`), `overrides` de `minimatch` → 11.0.8 (GHSA-g3hv-75wg-m249, solo desarrollo). CI: acciones por hash, `persist-credentials: false`, `pnpm audit --audit-level=low`, `SHA256SUMS.txt` | Equipo de laboratorio conectado a internet; ver `docs/SEGURIDAD.md` |
 | 2026-11-16 | **SQLite en escritorio (T9.4)**: `node:sqlite` (`DatabaseSync`) en el proceso principal, archivo `userData/mi-lab.db`; `journal_mode=WAL` + `synchronous=FULL` (cada guardado confirmado sobrevive a un corte de luz; con guardados cada ≥ 300 ms el coste del fsync no se nota), `foreign_keys=ON` con FK diferidas, tablas `STRICT`, esquema versionado con `PRAGMA user_version` (cada migración en su transacción; una base de una versión más nueva se rechaza sin tocarla). Guardar = diff por id en UNA transacción (upsert de nuevos/cambiados, delete de los que faltan) contra una caché en memoria de lo escrito; el orden de los arreglos se guarda en `pos` y se conserva al agregar/borrar sin renumerar. Medido (Node 22, ×10 = 21 600 movimientos, 3.8 MB): 1.ª escritura 258 ms, carga 166 ms, guardar 1 cambio 77 ms, agregar+borrar 1 movimiento 32 ms, abrir+cargar 120 ms. La página sigue enviando el `InventoryData` completo (JSON ≤ 20 MB ≈ 80 000 movimientos) y valida lo que carga con `migrate`; el puente expone `load/save/clear/onFlushRequest` (`readRaw` del repositorio usa `load`: es el mismo texto). Migración: mientras exista la clave `mi-lab:inventory:v1` y no `mi-lab:migrated-to-sqlite`, sus datos (si son válidos) se escriben, se releen y se comparan; solo si coinciden se renombra la clave (se conserva el JSON). Si falla, la sesión sigue en `localStorage` con un aviso y se reintenta al abrir. Cierre: el evento `close` de la ventana pide a la página guardar lo pendiente y espera (máx. 5 s); `pagehide` sigue como respaldo. Electron no emite `close` si la página llama a `window.close()` (la app no lo hace) | Quitar el límite de `localStorage` antes de importar datos reales; nunca perder datos en la migración ni al cerrar |
+| 2026-11-19 | **Editar lote (T9.5)**: se corrigen datos del lote, no movimientos. Editables: N.º de lote (único por producto), vencimiento (posterior a la entrada; uno pasado se confirma como en la entrada), precio y procedencia (vacíos permitidos); motivo obligatorio. Cada campo cambiado se guarda en `InventoryData.lotChanges` (`from`/`to` como texto, ausente = vacío), omitido cuando no hay ninguno para que los datos anteriores se lean igual. El precio nuevo reemplaza el de todos los movimientos del lote (salvo ajustes, que no llevan precio) y la procedencia la de sus entradas: el lote tiene un solo precio y una sola procedencia, y los informes los toman de ahí; un informe ya exportado puede no coincidir, el historial lo explica. Deshacer la entrada que dejó el lote sin movimientos borra también sus correcciones; `migrate` descarta correcciones de lotes que no existen. Cantidad ("Ajustar") y producto (anular y registrar de nuevo) no se editan aquí. SQLite: esquema v2 con la tabla `lot_changes`; antes de migrar una base existente se escribe una copia completa `mi-lab.db.v<versión>.bak` con `VACUUM INTO` | Los usuarios pidieron corregir precio, vencimiento, lote y procedencia sin perder la trazabilidad que pide un laboratorio clínico |

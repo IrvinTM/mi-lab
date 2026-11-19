@@ -438,4 +438,85 @@ describe('inventory actions on the detail page', () => {
       expect(state().movements).toHaveLength(before);
     });
   });
+
+  describe('Editar lote', () => {
+    const open = async (user: ReturnType<typeof userEvent.setup>, lotNumber = 'LT-A') => {
+      await user.click(screen.getByRole('button', { name: `Editar el lote ${lotNumber}` }));
+      return screen.getByRole('dialog', { name: 'Editar lote' });
+    };
+
+    it('starts from the current values and saves the corrections with their history', async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const dialog = await open(user);
+      expect(within(dialog).getByLabelText('N.º de lote')).toHaveValue('LT-A');
+      expect(within(dialog).getByLabelText('Vencimiento')).toHaveValue('2026-12-01');
+      expect(within(dialog).getByLabelText('Procedencia')).toHaveValue('1');
+      expect(within(dialog).getByLabelText(/Precio unitario/)).toHaveValue('0.5');
+      expect(within(dialog).queryByText('Correcciones anteriores')).not.toBeInTheDocument();
+
+      const number = within(dialog).getByLabelText('N.º de lote');
+      await user.clear(number);
+      await user.type(number, 'lt-a2');
+      const price = within(dialog).getByLabelText(/Precio unitario/);
+      await user.clear(price);
+      await user.type(price, '0,45');
+      await user.selectOptions(within(dialog).getByLabelText('Procedencia'), '2');
+      fireEvent.change(within(dialog).getByLabelText('Vencimiento'), {
+        target: { value: '2027-01-15' },
+      });
+      await user.type(within(dialog).getByLabelText('Motivo de la corrección'), 'Según factura');
+      await user.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
+
+      expect(state().lots.find((l) => l.id === 'l-a')).toMatchObject({
+        lotNumber: 'LT-A2',
+        expiryDate: '2027-01-15',
+        unitPrice: 0.45,
+        sourceCode: 2,
+      });
+      expect(state().lotChanges?.map((change) => change.field)).toEqual([
+        'lotNumber',
+        'expiryDate',
+        'unitPrice',
+        'sourceCode',
+      ]);
+      expect(await screen.findByText('Lote corregido · Glucosa · Lote LT-A2')).toBeInTheDocument();
+
+      const again = await open(user, 'LT-A2');
+      expect(within(again).getByLabelText('N.º de lote')).toHaveValue('LT-A2');
+      const history = within(again).getByRole('list', { name: 'Correcciones anteriores' });
+      expect(history).toHaveTextContent('N.º de lote: LT-A → LT-A2');
+      expect(history).toHaveTextContent('Procedencia: GOES → Donación');
+      expect(history).toHaveTextContent('Según factura');
+      expectNoBrokenNumbers();
+    });
+
+    it('requires a reason and a change, and confirms an expiry date in the past', async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const dialog = await open(user);
+      await user.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
+      expect(within(dialog).getByText('Escribe el motivo de la corrección.')).toBeInTheDocument();
+
+      await user.type(within(dialog).getByLabelText('Motivo de la corrección'), 'Revisión');
+      await user.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
+      expect(within(dialog).getByText('No hay cambios que guardar.')).toBeInTheDocument();
+
+      fireEvent.change(within(dialog).getByLabelText('Vencimiento'), {
+        target: { value: '2026-11-01' },
+      });
+      await user.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
+      expect(within(dialog).getByRole('alert')).toHaveTextContent(
+        'Con esta fecha el lote queda vencido.',
+      );
+      expect(state().lotChanges).toBeUndefined();
+      await user.click(within(dialog).getByRole('button', { name: 'Guardar de todos modos' }));
+      expect(state().lots.find((l) => l.id === 'l-a')?.expiryDate).toBe('2026-11-01');
+    });
+
+    it('is offered on expired lots too', () => {
+      renderPage();
+      expect(screen.getByRole('button', { name: 'Editar el lote LT-OLD' })).toBeInTheDocument();
+    });
+  });
 });

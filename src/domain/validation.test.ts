@@ -2,6 +2,7 @@ import {
   findExistingLot,
   isValid,
   LIMITS,
+  lotEditChanges,
   MAX_ADJUSTMENT_REASON,
   normalizeLotNumber,
   validateAdjustment,
@@ -9,11 +10,13 @@ import {
   validateFundingSourceCode,
   validateFundingSourceName,
   validateIssue,
+  validateLotEdit,
   validateProduct,
   validateReceipt,
   validateSettings,
   type IssueContext,
   type IssueForm,
+  type LotEditForm,
   type ReceiptContext,
   type ReceiptForm,
 } from './validation';
@@ -536,5 +539,92 @@ describe('validateAdjustment, validateProduct, catalog and settings limits', () 
       'labName',
       'warningDays',
     ]);
+  });
+});
+
+describe('validateLotEdit / lotEditChanges (T9.5)', () => {
+  const lot: Lot = { ...existingLot, unitPrice: 0.5, sourceCode: 1 };
+  const other: Lot = { ...existingLot, id: 'l2', lotNumber: 'LT-OTRO' };
+  const context = {
+    lot,
+    lots: [lot, other],
+    fundingSources: receiptContext.fundingSources,
+    today: TODAY,
+  };
+  const form = (overrides: Partial<LotEditForm> = {}): LotEditForm => ({
+    lotNumber: lot.lotNumber,
+    expiryDate: lot.expiryDate,
+    unitPrice: 0.5,
+    sourceCode: 1,
+    reason: 'Error de digitación',
+    ...overrides,
+  });
+
+  it('lists only the changed fields, normalized, in a fixed order', () => {
+    expect(lotEditChanges(lot, form())).toEqual([]);
+    expect(lotEditChanges(lot, form({ lotNumber: ' lt123456 ' }))).toEqual([]);
+    expect(
+      lotEditChanges(
+        lot,
+        form({ sourceCode: 16, unitPrice: null, expiryDate: '2027-07-31', lotNumber: 'lt-9' }),
+      ),
+    ).toEqual([
+      { field: 'lotNumber', from: 'LT123456', to: 'LT-9' },
+      { field: 'expiryDate', from: '2027-06-30', to: '2027-07-31' },
+      { field: 'unitPrice', from: '0.5' },
+      { field: 'sourceCode', from: '1', to: '16' },
+    ]);
+    expect(lotEditChanges(existingLot, form({ unitPrice: 2, sourceCode: null }))).toEqual([
+      { field: 'unitPrice', to: '2' },
+    ]);
+  });
+
+  it('accepts a correction with a reason', () => {
+    expect(isValid(validateLotEdit(form({ unitPrice: 0.45 }), context))).toBe(true);
+  });
+
+  it('needs a change and a reason', () => {
+    expect(validateLotEdit(form(), context).errors.form).toBe('No hay cambios que guardar.');
+    expect(validateLotEdit(form({ unitPrice: 1, reason: '  ' }), context).errors.reason).toBe(
+      'Escribe el motivo de la corrección.',
+    );
+    expect(
+      validateLotEdit(form({ unitPrice: 1, reason: 'x'.repeat(LIMITS.longText + 1) }), context)
+        .errors.reason,
+    ).toMatch(/no puede superar/);
+  });
+
+  it('rejects a lot number already used by another lot of the product', () => {
+    expect(validateLotEdit(form({ lotNumber: 'lt-otro' }), context).errors.lotNumber).toBe(
+      'Este producto ya tiene un lote LT-OTRO.',
+    );
+    expect(validateLotEdit(form({ lotNumber: ' ' }), context).errors.lotNumber).toBe(
+      'Ingresa el número de lote.',
+    );
+  });
+
+  it('keeps the expiry after the receipt; a past date is only a warning', () => {
+    expect(validateLotEdit(form({ expiryDate: '2026-05-01' }), context).errors.expiryDate).toMatch(
+      /posterior a la fecha de entrada/,
+    );
+    expect(validateLotEdit(form({ expiryDate: '2026-02-30' }), context).errors.expiryDate).toBe(
+      'Ingresa una fecha de vencimiento válida.',
+    );
+    const past = validateLotEdit(form({ expiryDate: '2026-11-01' }), context);
+    expect(isValid(past)).toBe(true);
+    expect(past.warnings.expiryDate).toBe('Con esta fecha el lote queda vencido.');
+  });
+
+  it('checks the price and the source', () => {
+    expect(validateLotEdit(form({ unitPrice: -1 }), context).errors.unitPrice).toBe(
+      'El precio no puede ser negativo.',
+    );
+    expect(
+      validateLotEdit(form({ unitPrice: LIMITS.maxNumber + 1 }), context).errors.unitPrice,
+    ).toMatch(/no puede superar/);
+    expect(validateLotEdit(form({ sourceCode: 99 }), context).errors.sourceCode).toBe(
+      'Elige una procedencia válida.',
+    );
+    expect(isValid(validateLotEdit(form({ sourceCode: null }), context))).toBe(true);
   });
 });
